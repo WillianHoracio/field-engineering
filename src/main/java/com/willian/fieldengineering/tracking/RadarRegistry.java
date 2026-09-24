@@ -3,17 +3,19 @@ package com.willian.fieldengineering.tracking;
 import com.willian.fieldengineering.blockentity.RadarBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.entity.BlockEntity;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.Map;
 
 public final class RadarRegistry {
 
-    private static final Map<ServerLevel, Map<Long, RadarBlockEntity>> RADARS_BY_LEVEL =
+    private static final Map<ServerLevel, Set<Long>> RADARS_BY_LEVEL =
             new WeakHashMap<>();
 
     private RadarRegistry() {
@@ -21,31 +23,24 @@ public final class RadarRegistry {
 
     public static void register(
             ServerLevel level,
-            RadarBlockEntity radar
+            BlockPos radarPos
     ) {
         RADARS_BY_LEVEL
-                .computeIfAbsent(level, ignored -> new HashMap<>())
-                .put(
-                        radar.getBlockPos().asLong(),
-                        radar
-                );
+                .computeIfAbsent(level, ignored -> new HashSet<>())
+                .add(radarPos.asLong());
     }
 
     public static void unregister(
             ServerLevel level,
-            RadarBlockEntity radar
+            BlockPos radarPos
     ) {
-        Map<Long, RadarBlockEntity> radars =
-                RADARS_BY_LEVEL.get(level);
+        Set<Long> radars = RADARS_BY_LEVEL.get(level);
 
         if (radars == null) {
             return;
         }
 
-        radars.remove(
-                radar.getBlockPos().asLong(),
-                radar
-        );
+        radars.remove(radarPos.asLong());
 
         if (radars.isEmpty()) {
             RADARS_BY_LEVEL.remove(level);
@@ -57,45 +52,36 @@ public final class RadarRegistry {
             BlockPos origin,
             double range
     ) {
-        Map<Long, RadarBlockEntity> radars =
-                RADARS_BY_LEVEL.get(level);
+        Set<Long> radars = RADARS_BY_LEVEL.get(level);
 
         if (radars == null || radars.isEmpty()) {
             return List.of();
         }
 
         double rangeSqr = range * range;
+        List<RadarBlockEntity> result = new ArrayList<>();
 
-        List<RadarBlockEntity> result =
-                new ArrayList<>();
-
-        Iterator<Map.Entry<Long, RadarBlockEntity>> iterator =
-                radars.entrySet().iterator();
+        Iterator<Long> iterator = radars.iterator();
 
         while (iterator.hasNext()) {
-            RadarBlockEntity radar =
-                    iterator.next().getValue();
+            BlockPos radarPos = BlockPos.of(iterator.next());
 
-            if (radar == null || radar.isRemoved()) {
-                iterator.remove();
+            double deltaX = radarPos.getX() - origin.getX();
+            double deltaZ = radarPos.getZ() - origin.getZ();
+
+            double horizontalDistanceSqr =
+                    deltaX * deltaX + deltaZ * deltaZ;
+
+            if (horizontalDistanceSqr > rangeSqr) {
                 continue;
             }
 
-            BlockPos radarPos =
-                    radar.getBlockPos();
+            BlockEntity blockEntity = level.getBlockEntity(radarPos);
 
-            double deltaX =
-                    radarPos.getX() - origin.getX();
-
-            double deltaZ =
-                    radarPos.getZ() - origin.getZ();
-
-            double horizontalDistanceSqr =
-                    deltaX * deltaX
-                            + deltaZ * deltaZ;
-
-            if (horizontalDistanceSqr <= rangeSqr) {
+            if (blockEntity instanceof RadarBlockEntity radar && !radar.isRemoved()) {
                 result.add(radar);
+            } else {
+                iterator.remove();
             }
         }
 
