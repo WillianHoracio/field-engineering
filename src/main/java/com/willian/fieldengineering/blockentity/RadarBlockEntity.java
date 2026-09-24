@@ -21,12 +21,6 @@ public class RadarBlockEntity extends BlockEntity {
 
     private static final double RANGE = 100.0;
     private static final double RANGE_SQR = RANGE * RANGE;
-
-    /*
-     * Varios launchers podem consultar o mesmo radar em ticks proximos.
-     * O radar executa no maximo um scan de entidades por segundo e reutiliza
-     * o resultado entre consultas dentro desta janela.
-     */
     private static final long SCAN_CACHE_TICKS = 20L;
 
     private final List<UUID> cachedTargetUuids = new ArrayList<>();
@@ -77,18 +71,13 @@ public class RadarBlockEntity extends BlockEntity {
     }
 
     private void scan(ServerLevel level) {
-        AABB area =
-                new AABB(worldPosition)
-                        .inflate(RANGE);
+        AABB area = new AABB(worldPosition).inflate(RANGE);
 
         List<LivingEntity> targets =
                 level.getEntitiesOfClass(
                         LivingEntity.class,
                         area,
-                        entity -> isValidTarget(
-                                level,
-                                entity
-                        )
+                        entity -> isValidTarget(level, entity)
                 );
 
         cachedTargetUuids.clear();
@@ -111,10 +100,6 @@ public class RadarBlockEntity extends BlockEntity {
             }
         }
 
-        /*
-         * Mantem o feedback visual de debug sem multiplicar particulas
-         * pela quantidade de alvos detectados.
-         */
         if (nearestTarget != null) {
             showTargetParticles(level, nearestTarget);
         }
@@ -181,7 +166,7 @@ public class RadarBlockEntity extends BlockEntity {
             return;
         }
 
-        RadarRegistry.register(level, this);
+        RadarRegistry.register(level, worldPosition);
         registered = true;
     }
 
@@ -191,7 +176,7 @@ public class RadarBlockEntity extends BlockEntity {
                 registered
                         && getLevel() instanceof ServerLevel serverLevel
         ) {
-            RadarRegistry.unregister(serverLevel, this);
+            RadarRegistry.unregister(serverLevel, worldPosition);
         }
 
         registered = false;
