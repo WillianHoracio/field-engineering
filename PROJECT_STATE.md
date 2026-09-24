@@ -10,14 +10,15 @@ Update this file whenever a meaningful feature is completed, removed, or changes
 - Loom 1.8.13 builds a valid production JAR.
 - Production artifact: `build/libs/field-engineering-1.0.0.jar`.
 - The mod loads in the real launcher/modpack.
+- The performance foundation refactor has been merged to `main`.
 
 ## Current branch under test
 
 ```text
-refactor/performance-foundation
+fix/issue-2-missile-long-range-visuals
 ```
 
-This branch is intentionally focused on performance, runtime coordination, cleanup, and correctness. No merge to `main` should happen until real-world testing is approved.
+The branch was reset to `main` after the previous tracking/remote-visual experiments did not improve the real result. The current approach is intentionally minimal and keeps the original missile simulation intact.
 
 ## Implemented
 
@@ -54,9 +55,13 @@ This branch is intentionally focused on performance, runtime coordination, clean
 
 ### Missile
 
-- Ascending and descending phases.
-- Firework/smoke/flame trail.
-- Positional launch/impact flow.
+- Original ascending and descending server behavior preserved from `main`.
+- Original close-range firework/smoke/flame particles preserved.
+- Custom client renderer replaces the plain `ThrownItemRenderer`.
+- Vanilla firework body is rendered at 2x visual scale for readability.
+- Renderer adds a layered 8-block velocity-aligned trail directly in the render pipeline.
+- The direct trail does not use the vanilla particle system and therefore is not subject to particle render-distance limits.
+- Positional launch/impact flow remains unchanged.
 - Explosion damages entities without terrain destruction.
 
 ### Audio
@@ -71,57 +76,38 @@ explosion.ogg
 
 Current audio works, but future design may add entity-attached loops, distance layers, directional behavior, and Doppler-like pitch changes.
 
-## Performance refactor details
+## Previous issue #2 experiments
 
-The original implementation used `BlockEntitySearch`, which scanned every block coordinate inside a large volume when each launcher searched for a radar. At radius 128 this could approach roughly 17 million block positions per search, and it repeated across launchers/ticks.
+Two approaches were tested and rejected before the current renderer-based implementation:
 
-That code has been removed.
+1. increasing missile tracking/render range and moving the particle trail client-side;
+2. a remote deterministic missile-visual manager independent of physical entity tracking.
 
-The replacement model is:
-
-```text
-radar loaded
-    -> register coordinate
-
-launcher acquisition cycle
-    -> inspect registered radar coordinates only
-    -> cheap X/Z squared-distance filtering
-    -> resolve only in-range radar block entities
-    -> request cached/on-demand radar scans
-    -> combine targets
-    -> reserve one available target
-```
-
-Air-target classification was also changed from a possible 128-block downward loop per check to a heightmap lookup because valid targets are already required to be under open sky.
-
-Unused Fabric template mixins/configuration were removed from the project.
+Real-world testing showed no useful improvement, and the second approach made the visual result worse. The clean launcher test then showed that the vanilla rocket entity itself remains visible at useful distance while the particle trail disappears much earlier. This redirected the fix toward direct rendering rather than networking/tracking changes.
 
 ## Real-world test to perform
 
-Recommended sequence:
-
-1. one launcher + one radar + one target;
-2. five launchers + four radars + multiple eligible targets;
-3. several launchers with only one target, confirming only one launcher engages it;
-4. multiple targets, confirming launchers distribute reservations;
-5. destroy a radar and verify launchers recover cleanly;
-6. destroy/unload a launcher during engagement and verify no permanent reservation remains;
-7. test an airborne target and a ground target together, confirming air priority;
-8. stress with 10+ launchers/radars and observe world/server tick responsiveness.
+1. confirm the close-range launch still looks and behaves like `main`;
+2. verify the vanilla rocket body is visibly larger but still recognizable;
+3. observe the missile at increasing distance and verify the direct trail remains visible after vanilla particles disappear;
+4. test both ascending and descending missiles;
+5. confirm there is no altered timing, impact point, damage, audio, or target reservation behavior;
+6. fire several missiles and check client FPS.
 
 Watch specifically for:
 
-- mob/world freezes;
-- launchers firing in a synchronized rhythm;
-- duplicated engagement of one target;
-- stale radar references after breaking/unloading;
-- targets never becoming available again after a cancelled engagement;
-- altered launch timing or audiovisual sequence.
+- trail disappearing at the same distance as vanilla particles;
+- trail not aligning with missile movement;
+- line width behaving differently with Sodium/Iris/shaders;
+- excessive visual thickness close to the camera;
+- altered missile behavior unrelated to rendering.
 
 ## Known/intentional constraints
 
 - Radar scans still use Minecraft entity AABB queries; this is expected to be much cheaper than block-volume scanning and is currently cached/shared.
-- Missile particle density remains intentionally high because the current visual result was explicitly approved. Revisit only if missile-heavy stress tests show measurable network/client cost.
+- Existing vanilla particles are intentionally retained as close-range detail for now.
+- The new direct trail still depends on the missile entity itself being rendered; current testing indicates the entity remains visible farther than the particles.
+- Missile model replacement/refinement is deferred to a separate future PR.
 - PvE is the priority; multiplayer is not currently a design target.
 - Existing missile timing/feel should not be casually changed.
 - World-generation changes should avoid visible seams in already-generated large worlds.
