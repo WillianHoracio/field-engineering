@@ -2,15 +2,18 @@ package com.willian.fieldengineering.blockentity;
 
 import com.willian.fieldengineering.registry.ModBlockEntities;
 import com.willian.fieldengineering.target.TargetRules;
+import com.willian.fieldengineering.tracking.RadarRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -18,12 +21,19 @@ import java.util.UUID;
 public class RadarBlockEntity extends BlockEntity {
 
     private static final double RANGE = 100.0;
+    private static final double RANGE_SQR = RANGE * RANGE;
 
-    private static final int SCAN_INTERVAL_TICKS = 10;
+    /*
+     * Varios launchers podem consultar o mesmo radar em ticks proximos.
+     * O radar executa no maximo um scan de entidades por segundo e reutiliza
+     * o resultado entre consultas dentro desta janela.
+     */
+    private static final long SCAN_CACHE_TICKS = 20L;
 
-    private UUID targetUuid;
+    private final List<UUID> cachedTargetUuids = new ArrayList<>();
 
-    private int scanTimer = 0;
+    private long lastScanTick = Long.MIN_VALUE;
+    private boolean registered = false;
 
     public RadarBlockEntity(
             BlockPos pos,
@@ -46,88 +56,97 @@ public class RadarBlockEntity extends BlockEntity {
             return;
         }
 
-        radar.scanTimer++;
-
-        if (radar.scanTimer < SCAN_INTERVAL_TICKS) {
-            return;
-        }
-
-        radar.scanTimer = 0;
-
-        LivingEntity target =
-                radar.findTarget(
-                        serverLevel,
-                        pos
-                );
-
-        if (target == null) {
-            radar.targetUuid = null;
-            return;
-        }
-
-        radar.targetUuid =
-                target.getUUID();
-
-        radar.showTargetParticles(
-                serverLevel,
-                target
-        );
+        radar.ensureRegistered(serverLevel);
     }
 
-    private LivingEntity findTarget(
-            ServerLevel level,
-            BlockPos radarPos
+    public List<LivingEntity> getDetectedTargets(
+            ServerLevel level
     ) {
+        ensureRegistered(level);
+
+        long gameTime = level.getGameTime();
+
+        if (
+                lastScanTick == Long.MIN_VALUE
+                        || gameTime - lastScanTick >= SCAN_CACHE_TICKS
+        ) {
+            scan(level);
+            lastScanTick = gameTime;
+        }
+
+        return resolveCachedTargets(level);
+    }
+
+    private void scan(ServerLevel level) {
         AABB area =
-                new AABB(radarPos)
+                new AABB(worldPosition)
                         .inflate(RANGE);
 
         List<LivingEntity> targets =
                 level.getEntitiesOfClass(
                         LivingEntity.class,
                         area,
-                        entity ->
-                                isValidTarget(
-                                        level,
-                                        radarPos,
-                                        entity
-                                )
+                        entity -> isValidTarget(
+                                level,
+                                entity
+                        )
                 );
 
-        return targets.stream()
-                .min(
-                        Comparator.comparingDouble(
-                                entity ->
-                                        entity.distanceToSqr(
-                                                radarPos.getX() + 0.5,
-                                                radarPos.getY() + 0.5,
-                                                radarPos.getZ() + 0.5
-                                        )
+        targets.sort(
+                Comparator.comparingDouble(
+                        entity -> entity.distanceToSqr(
+                                worldPosition.getX() + 0.5,
+                                worldPosition.getY() + 0.5,
+                                worldPosition.getZ() + 0.5
                         )
                 )
-                .orElse(null);
+        );
+
+        cachedTargetUuids.clear();
+
+        for (LivingEntity target : targets) {
+            cachedTargetUuids.add(target.getUUID());
+            showTargetParticles(level, target);
+        }
+    }
+
+    private List<LivingEntity> resolveCachedTargets(
+            ServerLevel level
+    ) {
+        if (cachedTargetUuids.isEmpty()) {
+            return List.of();
+        }
+
+        List<LivingEntity> targets =
+                new ArrayList<>(cachedTargetUuids.size());
+
+        for (UUID targetUuid : cachedTargetUuids) {
+            Entity entity = level.getEntity(targetUuid);
+
+            if (
+                    entity instanceof LivingEntity livingEntity
+                            && isValidTarget(level, livingEntity)
+            ) {
+                targets.add(livingEntity);
+            }
+        }
+
+        return targets;
     }
 
     private boolean isValidTarget(
             ServerLevel level,
-            BlockPos radarPos,
             LivingEntity entity
     ) {
-        if (!TargetRules.isValidTarget(
-                level,
-                entity
-        )) {
+        if (!TargetRules.isValidTarget(level, entity)) {
             return false;
         }
 
-        double distanceSqr =
-                entity.distanceToSqr(
-                        radarPos.getX() + 0.5,
-                        radarPos.getY() + 0.5,
-                        radarPos.getZ() + 0.5
-                );
-
-        return distanceSqr <= RANGE * RANGE;
+        return entity.distanceToSqr(
+                worldPosition.getX() + 0.5,
+                worldPosition.getY() + 0.5,
+                worldPosition.getZ() + 0.5
+        ) <= RANGE_SQR;
     }
 
     private void showTargetParticles(
@@ -137,8 +156,7 @@ public class RadarBlockEntity extends BlockEntity {
         level.sendParticles(
                 ParticleTypes.ELECTRIC_SPARK,
                 target.getX(),
-                target.getY()
-                        + target.getBbHeight(),
+                target.getY() + target.getBbHeight(),
                 target.getZ(),
                 8,
                 0.4,
@@ -148,30 +166,28 @@ public class RadarBlockEntity extends BlockEntity {
         );
     }
 
-    public UUID getTargetUuid() {
-        return targetUuid;
+    private void ensureRegistered(ServerLevel level) {
+        if (registered) {
+            return;
+        }
+
+        RadarRegistry.register(level, this);
+        registered = true;
     }
 
-    public LivingEntity getTarget(
-            ServerLevel level
-    ) {
-        if (targetUuid == null) {
-            return null;
-        }
-
-        var entity =
-                level.getEntity(targetUuid);
-
+    @Override
+    public void setRemoved() {
         if (
-                entity instanceof LivingEntity livingEntity
-                        && TargetRules.isValidTarget(
-                        level,
-                        livingEntity
-                )
+                registered
+                        && getLevel() instanceof ServerLevel serverLevel
         ) {
-            return livingEntity;
+            RadarRegistry.unregister(serverLevel, this);
         }
 
-        return null;
+        registered = false;
+        cachedTargetUuids.clear();
+        lastScanTick = Long.MIN_VALUE;
+
+        super.setRemoved();
     }
 }
