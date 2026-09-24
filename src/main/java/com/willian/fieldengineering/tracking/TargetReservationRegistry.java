@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.WeakHashMap;
@@ -24,8 +23,6 @@ public final class TargetReservationRegistry {
             UUID targetUuid,
             BlockPos launcherPos
     ) {
-        cleanupExpired(level);
-
         Map<UUID, Reservation> reservations =
                 RESERVATIONS_BY_LEVEL.computeIfAbsent(
                         level,
@@ -35,7 +32,12 @@ public final class TargetReservationRegistry {
         long launcherKey = launcherPos.asLong();
         Reservation current = reservations.get(targetUuid);
 
-        if (current != null && current.launcherKey != launcherKey) {
+        if (isExpired(level, current)) {
+            reservations.remove(targetUuid);
+            current = null;
+        }
+
+        if (current != null && current.launcherKey() != launcherKey) {
             return false;
         }
 
@@ -55,8 +57,6 @@ public final class TargetReservationRegistry {
             UUID targetUuid,
             BlockPos launcherPos
     ) {
-        cleanupExpired(level);
-
         Map<UUID, Reservation> reservations =
                 RESERVATIONS_BY_LEVEL.get(level);
 
@@ -66,8 +66,18 @@ public final class TargetReservationRegistry {
 
         Reservation reservation = reservations.get(targetUuid);
 
+        if (isExpired(level, reservation)) {
+            reservations.remove(targetUuid);
+
+            if (reservations.isEmpty()) {
+                RESERVATIONS_BY_LEVEL.remove(level);
+            }
+
+            return false;
+        }
+
         return reservation != null
-                && reservation.launcherKey != launcherPos.asLong();
+                && reservation.launcherKey() != launcherPos.asLong();
     }
 
     public static void release(
@@ -89,7 +99,10 @@ public final class TargetReservationRegistry {
         long launcherKey = launcherPos.asLong();
         Reservation reservation = reservations.get(targetUuid);
 
-        if (reservation != null && reservation.launcherKey == launcherKey) {
+        if (
+                reservation != null
+                        && reservation.launcherKey() == launcherKey
+        ) {
             reservations.remove(targetUuid);
         }
 
@@ -112,7 +125,7 @@ public final class TargetReservationRegistry {
         long launcherKey = launcherPos.asLong();
 
         reservations.entrySet().removeIf(
-                entry -> entry.getValue().launcherKey == launcherKey
+                entry -> entry.getValue().launcherKey() == launcherKey
         );
 
         if (reservations.isEmpty()) {
@@ -120,27 +133,12 @@ public final class TargetReservationRegistry {
         }
     }
 
-    private static void cleanupExpired(ServerLevel level) {
-        Map<UUID, Reservation> reservations =
-                RESERVATIONS_BY_LEVEL.get(level);
-
-        if (reservations == null) {
-            return;
-        }
-
-        long gameTime = level.getGameTime();
-        Iterator<Map.Entry<UUID, Reservation>> iterator =
-                reservations.entrySet().iterator();
-
-        while (iterator.hasNext()) {
-            if (iterator.next().getValue().expiresAtTick <= gameTime) {
-                iterator.remove();
-            }
-        }
-
-        if (reservations.isEmpty()) {
-            RESERVATIONS_BY_LEVEL.remove(level);
-        }
+    private static boolean isExpired(
+            ServerLevel level,
+            Reservation reservation
+    ) {
+        return reservation != null
+                && reservation.expiresAtTick() <= level.getGameTime();
     }
 
     private record Reservation(
