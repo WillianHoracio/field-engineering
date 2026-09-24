@@ -11,26 +11,44 @@ Update this file whenever a meaningful feature is completed, removed, or changes
 - Production artifact: `build/libs/field-engineering-1.0.0.jar`.
 - The mod loads in the real launcher/modpack.
 
+## Current branch under test
+
+```text
+refactor/performance-foundation
+```
+
+This branch is intentionally focused on performance, runtime coordination, cleanup, and correctness. No merge to `main` should happen until real-world testing is approved.
+
 ## Implemented
 
 ### Radar
 
 - 100-block target range.
-- Periodic target scan.
 - Open-sky requirement.
 - High-value hostile target allow-list.
 - Air/ground classification.
-- Debug target particles.
+- Radar coordinates registered per dimension/server level.
+- On-demand entity scanning instead of continuous autonomous scanning.
+- Scan results cached for 20 ticks so multiple launchers can reuse one scan.
+- Debug particles remain limited to one detected target per scan.
 
 ### Launcher
 
 - 3x3x2 multiblock footprint.
 - Central master block with invisible structural parts.
-- Nearest-radar integration.
+- Radar discovery through `RadarRegistry`; no block-volume brute-force search.
+- Radar range check is horizontal (X/Z) and uses squared distance.
+- Idle target acquisition occurs approximately every 5 seconds.
+- Each launcher has its own deterministic timing offset to avoid synchronized fire cycles.
+- Targets from all in-range radars are merged and deduplicated by UUID.
+- Air targets are preferred when available.
+- Within a priority class, the closest available target is selected.
+- Target reservation prevents multiple launchers from wasting missiles on the same entity.
 - Preparation smoke and launch effects.
 - Ascending missile visual.
 - Delayed strike phase.
 - Last-known target coordinates.
+- Last-known air/ground state survives target death before lock.
 - Different lock-to-descent delay for air and ground targets.
 - Cooldown.
 
@@ -53,47 +71,71 @@ explosion.ogg
 
 Current audio works, but future design may add entity-attached loops, distance layers, directional behavior, and Doppler-like pitch changes.
 
-## Confirmed real-world test
+## Performance refactor details
 
-A test with approximately five launchers and four radars against an AirRaid target functioned logically, but produced severe world/server-tick freezes even when launchers were not firing.
+The original implementation used `BlockEntitySearch`, which scanned every block coordinate inside a large volume when each launcher searched for a radar. At radius 128 this could approach roughly 17 million block positions per search, and it repeated across launchers/ticks.
 
-The likely cause is the current brute-force nearby block-entity search used to discover radars. With a search radius of 128, a cube can contain about 17 million block positions. Multiplying this by several launchers and repeated execution is predictably too expensive.
+That code has been removed.
 
-This is considered a design/performance defect, not an acceptable cost of the feature.
+The replacement model is:
 
-## Immediate priority
+```text
+radar loaded
+    -> register coordinate
 
-Replace brute-force radar discovery with a registry/cache of active radar positions.
+launcher acquisition cycle
+    -> inspect registered radar coordinates only
+    -> cheap X/Z squared-distance filtering
+    -> resolve only in-range radar block entities
+    -> request cached/on-demand radar scans
+    -> combine targets
+    -> reserve one available target
+```
 
-Acceptance goals:
+Air-target classification was also changed from a possible 128-block downward loop per check to a heightmap lookup because valid targets are already required to be under open sky.
 
-- no scan through millions of block positions;
-- radar registration/unregistration follows block entity lifecycle;
-- launchers query only known radar entries;
-- selected radar is cached when possible;
-- invalid/unloaded radar references recover cleanly;
-- multiple launchers/radars should remain cheap while idle;
-- behavior of the existing missile sequence should remain unchanged.
+Unused Fabric template mixins/configuration were removed from the project.
 
-## Next gameplay work after performance
+## Real-world test to perform
+
+Recommended sequence:
+
+1. one launcher + one radar + one target;
+2. five launchers + four radars + multiple eligible targets;
+3. several launchers with only one target, confirming only one launcher engages it;
+4. multiple targets, confirming launchers distribute reservations;
+5. destroy a radar and verify launchers recover cleanly;
+6. destroy/unload a launcher during engagement and verify no permanent reservation remains;
+7. test an airborne target and a ground target together, confirming air priority;
+8. stress with 10+ launchers/radars and observe world/server tick responsiveness.
+
+Watch specifically for:
+
+- mob/world freezes;
+- launchers firing in a synchronized rhythm;
+- duplicated engagement of one target;
+- stale radar references after breaking/unloading;
+- targets never becoming available again after a cancelled engagement;
+- altered launch timing or audiovisual sequence.
+
+## Known/intentional constraints
+
+- Radar scans still use Minecraft entity AABB queries; this is expected to be much cheaper than block-volume scanning and is currently cached/shared.
+- Missile particle density remains intentionally high because the current visual result was explicitly approved. Revisit only if missile-heavy stress tests show measurable network/client cost.
+- PvE is the priority; multiplayer is not currently a design target.
+- Existing missile timing/feel should not be casually changed.
+- World-generation changes should avoid visible seams in already-generated large worlds.
+- Integrations should avoid hard dependencies on another mod's internals when a robust generic rule is sufficient.
+- The user owns gameplay/system design decisions. Code should implement those decisions rather than silently redefining them.
+
+## Next gameplay work after approval
 
 Potential sequence:
 
-1. radar/launcher performance architecture;
-2. air-target priority;
-3. target reservation and launcher coordination;
-4. ammunition and ownership;
-5. interceptors;
-6. hostile Illager batteries;
-7. tactical Illager AI;
-8. siege/game-mode systems and military points of interest.
+1. ammunition and ownership/player kill attribution;
+2. interceptors;
+3. hostile Illager batteries;
+4. tactical Illager AI;
+5. siege/game-mode systems and military points of interest.
 
 This list can change according to user design decisions.
-
-## Known design principles
-
-- PvE is the priority; multiplayer is not currently a design target.
-- Existing missile timing/feel should not be casually changed; the current launch sequence was explicitly approved.
-- World-generation changes should avoid visible seams in already-generated large worlds. Prefer retrofit/event approaches when possible.
-- Integrations should avoid hard dependencies on another mod's internals when a robust generic rule is sufficient.
-- The user owns gameplay/system design decisions. Code should implement those decisions rather than silently redefining them.
