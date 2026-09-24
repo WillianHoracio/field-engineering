@@ -113,21 +113,24 @@ The explosion damages entities and causes knockback but does not destroy terrain
 
 The launcher tracks the active target and continuously stores its last known coordinates before lock so a strike can complete after target loss/death. Air/ground state is also stored with the last-known target state, so a target that dies before lock keeps the correct descent timing.
 
-### Missile entity
-Primary file:
+### Missile entity and renderer
+Primary files:
 
 ```text
 entity/MissileEntity.java
+client/render/MissileRenderer.java
 ```
 
 Responsibilities:
 
-- render as a projectile entity;
-- ascending visual phase;
-- descending visual phase;
-- dense firework/smoke/flame trail;
+- preserve the existing server-authoritative ascending and descending missile entity;
+- keep the approved firework/smoke/flame particles for close-range detail;
+- render the vanilla firework body at a larger client-side scale for readability;
+- render a direct client-side layered trail from missile velocity, independent of the vanilla particle-distance limit;
 - impact at the locked coordinate;
 - vanilla explosion with terrain destruction disabled.
+
+The direct trail is part of the entity renderer rather than a particle stream. This means the long-range readability layer follows the missile whenever the entity itself is rendered, while the existing particles remain a local-detail effect.
 
 Current missile ownership is not attributed to the player. Player kill credit is a future requirement.
 
@@ -184,6 +187,8 @@ lifecycle/event -> registry/index -> cheap mathematical filter -> resolve only r
 ```
 
 For periodic systems, spread work across time and cache shared results rather than making every instance independently repeat the same query.
+
+For missile visuals, prefer a bounded render-time effect derived from already-synchronized entity velocity over increasing continuous server particle traffic.
 
 ## Planned systems
 
