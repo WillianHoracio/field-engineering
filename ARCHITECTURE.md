@@ -24,22 +24,26 @@ Primary files:
 ```text
 block/RadarBlock.java
 blockentity/RadarBlockEntity.java
+tracking/RadarRegistry.java
 target/TargetRules.java
 ```
 
-Current responsibilities:
+Responsibilities:
 
-- scan for eligible living targets;
+- register loaded radar coordinates by server level/dimension;
+- scan for eligible living targets only when a launcher requests data;
+- cache scan results for 20 ticks so nearby launchers can reuse one scan;
 - range: 100 blocks;
-- scan interval: 10 ticks;
 - require open sky;
 - ignore ordinary low-value mobs;
-- expose the currently selected target to launchers;
-- render debug electric-spark particles on a selected target.
+- return all currently valid detected targets to launchers;
+- keep debug electric-spark feedback limited to the nearest detected target.
+
+The registry stores coordinates rather than permanent `BlockEntity` references. Launchers first perform cheap X/Z distance checks against registered coordinates, then resolve only in-range radar block entities.
 
 Current target classes include Pillager, Vindicator, Evoker, Witch, Ravager, Wither, Ender Dragon, Warden, Elder Guardian, and Piglin Brute.
 
-A target is considered airborne when it is at least two blocks above detected ground. This is intentionally based on spatial state rather than an AirRaid-specific API.
+A target is considered airborne when it is at least two blocks above the motion-blocking surface. Because valid targets must be under open sky, heightmap lookup replaces the old downward block-by-block scan.
 
 ### Missile launcher
 Primary files:
@@ -48,7 +52,8 @@ Primary files:
 block/AATurretBlock.java
 block/LauncherPartBlock.java
 blockentity/LauncherBlockEntity.java
-blockentity/BlockEntitySearch.java
+tracking/RadarRegistry.java
+tracking/TargetReservationRegistry.java
 ```
 
 Physical structure:
@@ -60,9 +65,38 @@ Physical structure:
 - breaking an auxiliary part destroys the master;
 - the master removes the auxiliary parts when removed.
 
-The master owns the block entity and launcher state.
+The master owns launcher state.
 
-#### Current launch sequence
+#### Target acquisition
+
+Idle launchers do not search every tick.
+
+```text
+launcher idle
+    -> wait for its own acquisition timer (~5 s cycle)
+    -> query registered radars within 128 blocks horizontally
+    -> request cached/on-demand detections from those radars
+    -> merge targets and remove duplicate UUIDs
+    -> ignore targets reserved by another launcher
+    -> prefer an airborne target if available
+    -> otherwise choose the nearest available ground target
+    -> reserve target
+    -> begin preparation
+```
+
+Each launcher starts with a deterministic timing offset derived from its block position, so multiple launchers do not naturally enter synchronized acquisition/fire cycles.
+
+#### Target reservation
+
+`TargetReservationRegistry` is scoped per `ServerLevel`.
+
+```text
+target UUID -> launcher block position + timeout
+```
+
+A target can be reserved by only one launcher at a time. Other launchers move to the next available target instead of wasting missiles on the same entity. Reservations are released when engagement finishes/cancels or when the launcher is removed. A timeout protects against stale entries.
+
+#### Launch sequence
 
 ```text
 t = 0      static sound + preparation smoke
@@ -77,7 +111,7 @@ after 18 descending ticks: explosion at locked coordinate
 
 The explosion damages entities and causes knockback but does not destroy terrain.
 
-The launcher tracks the active target and continuously stores its last known coordinates before lock so a strike can complete after target loss/death.
+The launcher tracks the active target and continuously stores its last known coordinates before lock so a strike can complete after target loss/death. Air/ground state is also stored with the last-known target state, so a target that dies before lock keeps the correct descent timing.
 
 ### Missile entity
 Primary file:
@@ -115,6 +149,15 @@ registry/
 
 Contains block, block entity, entity, item, item group, and sound registration.
 
+### Runtime tracking
+Primary package:
+
+```text
+tracking/
+```
+
+Contains lightweight runtime indexes and coordination state. These systems must stay dimension-scoped and must clean up stale/unloaded state.
+
 ### Resources
 Primary root:
 
@@ -124,39 +167,28 @@ src/main/resources/assets/field-engineering/
 
 Contains blockstates, models, language entries, sounds, textures, and `sounds.json`.
 
-## Critical performance issue
+## Performance architecture
 
-`BlockEntitySearch`/launcher radar discovery currently performs a brute-force spatial scan over block positions in a large radius. At radius 128, a cube can contain roughly 17 million block positions before considering multiple launchers or repeated ticks.
+The removed `BlockEntitySearch` implementation scanned every block position in a large 3D volume. At radius 128 this could approach 17 million block positions per launcher search, which scaled catastrophically with multiple launchers.
 
-This implementation is not suitable for production-scale use and is the current highest-priority technical problem.
-
-Planned direction:
+Current rule:
 
 ```text
-radar placed/loaded
-    -> register position
-
-radar removed/unloaded
-    -> unregister position
-
-launcher needs radar
-    -> query registered radar positions only
-    -> filter by dimension/range/state
-    -> cache selected radar
-
-cached radar invalid
-    -> resolve another registered radar
+never rediscover sparse known systems by scanning world volume
 ```
 
-Do not replace this with another world-wide or chunk-wide repeated scan.
+Prefer:
+
+```text
+lifecycle/event -> registry/index -> cheap mathematical filter -> resolve only relevant objects
+```
+
+For periodic systems, spread work across time and cache shared results rather than making every instance independently repeat the same query.
 
 ## Planned systems
 
 These are design directions, not necessarily implemented:
 
-- air targets prioritized over ground targets;
-- target reservation so multiple launchers do not waste missiles on the same target;
-- staggered launches;
 - ammunition consumption;
 - launcher owner UUID and player kill attribution;
 - anti-missile interceptors;

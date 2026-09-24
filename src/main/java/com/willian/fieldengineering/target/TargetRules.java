@@ -5,21 +5,18 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.Set;
 
 public class TargetRules {
 
-    /*
-     * Apenas ameaças que justificam gastar um míssil.
-     */
     private static final Set<ResourceLocation> ALLOWED_TARGETS = Set.of(
             ResourceLocation.fromNamespaceAndPath("minecraft", "pillager"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "vindicator"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "evoker"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "witch"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "ravager"),
-
             ResourceLocation.fromNamespaceAndPath("minecraft", "wither"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "ender_dragon"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "warden"),
@@ -27,19 +24,7 @@ public class TargetRules {
             ResourceLocation.fromNamespaceAndPath("minecraft", "piglin_brute")
     );
 
-    /*
-     * A partir desta distância vertical do chão,
-     * tratamos o alvo como aéreo.
-     */
     private static final int AIR_TARGET_MIN_HEIGHT = 2;
-
-    /*
-     * Distância máxima que procuramos pelo chão.
-     *
-     * Se não encontrarmos nada abaixo dentro desse limite,
-     * consideramos o alvo aéreo.
-     */
-    private static final int GROUND_SEARCH_DEPTH = 128;
 
     private TargetRules() {
     }
@@ -74,12 +59,8 @@ public class TargetRules {
             ServerLevel level,
             LivingEntity entity
     ) {
-        int height = getHeightAboveGround(
-                level,
-                entity
-        );
-
-        return height >= AIR_TARGET_MIN_HEIGHT;
+        return getHeightAboveGround(level, entity)
+                >= AIR_TARGET_MIN_HEIGHT;
     }
 
     public static boolean isUnderOpenSky(
@@ -99,30 +80,23 @@ public class TargetRules {
             ServerLevel level,
             LivingEntity entity
     ) {
-        BlockPos entityPos = BlockPos.containing(
-                entity.getX(),
-                entity.getY(),
-                entity.getZ()
-        );
-
-        for (
-                int distance = 1;
-                distance <= GROUND_SEARCH_DEPTH;
-                distance++
-        ) {
-            BlockPos checkPos =
-                    entityPos.below(distance);
-
-            if (!level.getBlockState(checkPos).isAir()) {
-                return distance;
-            }
-        }
+        int x = entity.getBlockX();
+        int z = entity.getBlockZ();
 
         /*
-         * Não encontramos chão.
-         * Então certamente está alto o bastante
-         * para ser tratado como alvo aéreo.
+         * Valid targets must already be under open sky, so the motion-blocking
+         * heightmap gives us the relevant surface directly. This replaces the
+         * previous loop that could read up to 128 blocks for every check.
          */
-        return GROUND_SEARCH_DEPTH;
+        int surfaceY = level.getHeight(
+                Heightmap.Types.MOTION_BLOCKING,
+                x,
+                z
+        ) - 1;
+
+        return Math.max(
+                0,
+                entity.getBlockY() - surfaceY
+        );
     }
 }

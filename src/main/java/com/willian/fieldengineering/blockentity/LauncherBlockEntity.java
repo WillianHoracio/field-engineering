@@ -5,6 +5,8 @@ import com.willian.fieldengineering.entity.MissileEntity;
 import com.willian.fieldengineering.registry.ModBlockEntities;
 import com.willian.fieldengineering.registry.ModSounds;
 import com.willian.fieldengineering.target.TargetRules;
+import com.willian.fieldengineering.tracking.RadarRegistry;
+import com.willian.fieldengineering.tracking.TargetReservationRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -14,63 +16,41 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 
-import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class LauncherBlockEntity extends BlockEntity {
 
     private static final int PREPARATION_TICKS = 80;
-
     private static final int ASCENT_TICKS = 40;
-
     private static final int POST_ASCENT_WAIT_TICKS = 140;
-
-    /*
-     * Alvo terrestre:
-     *
-     * depois de travar a posição,
-     * espera 1,1 segundo.
-     */
     private static final int GROUND_LOCK_TO_DESCENT_TICKS = 22;
-
-    /*
-     * Alvo aéreo:
-     *
-     * o míssil começa a cair imediatamente
-     * após o lock.
-     */
     private static final int AIR_LOCK_TO_DESCENT_TICKS = 0;
-
-    /*
-     * 0,9 segundo de queda.
-     */
     private static final int DESCENT_TICKS = 18;
-
     private static final int COOLDOWN_TICKS = 400;
 
-    private static final double RADAR_SEARCH_RANGE = 128.0;
+    /*
+     * Launchers ociosos reavaliam alvos a cada cinco segundos.
+     * O offset inicial e derivado da posicao para evitar ciclos sincronizados.
+     */
+    private static final int ACQUISITION_INTERVAL_TICKS = 100;
 
+    private static final double RADAR_SEARCH_RANGE = 128.0;
     private static final double DESCENT_HEIGHT = 90.0;
 
     private int preparationTimer = 0;
-
     private int cooldownTimer = 0;
-
     private int strikeTimer = -1;
+    private int acquisitionTimer;
 
     private boolean preparing = false;
-
-    private RadarBlockEntity activeRadar;
-
     private UUID activeTargetUuid;
 
     private boolean impactPositionLocked = false;
-
     private boolean lockedTargetWasAirborne = false;
-
     private boolean descendingMissileSpawned = false;
 
     private double impactX;
@@ -82,6 +62,7 @@ public class LauncherBlockEntity extends BlockEntity {
     private double lastTargetZ;
 
     private boolean hasLastTargetPosition = false;
+    private boolean lastTargetWasAirborne = false;
 
     public LauncherBlockEntity(
             BlockPos pos,
@@ -91,6 +72,11 @@ public class LauncherBlockEntity extends BlockEntity {
                 ModBlockEntities.LAUNCHER,
                 pos,
                 state
+        );
+
+        acquisitionTimer = Math.floorMod(
+                Long.hashCode(pos.asLong()),
+                ACQUISITION_INTERVAL_TICKS
         );
     }
 
@@ -105,15 +91,11 @@ public class LauncherBlockEntity extends BlockEntity {
         }
 
         if (launcher.strikeTimer >= 0) {
-            launcher.tickStrikeSequence(
-                    serverLevel
-            );
+            launcher.tickStrikeSequence(serverLevel);
         }
 
         if (launcher.preparing) {
-            launcher.tickPreparation(
-                    serverLevel
-            );
+            launcher.tickPreparation(serverLevel);
             return;
         }
 
@@ -122,124 +104,158 @@ public class LauncherBlockEntity extends BlockEntity {
             return;
         }
 
-        launcher.tryStartPreparation(
-                serverLevel,
-                pos
-        );
+        if (launcher.acquisitionTimer > 0) {
+            launcher.acquisitionTimer--;
+            return;
+        }
+
+        launcher.acquisitionTimer = ACQUISITION_INTERVAL_TICKS;
+        launcher.tryStartPreparation(serverLevel, pos);
     }
 
     private void tryStartPreparation(
             ServerLevel level,
             BlockPos launcherPos
     ) {
-        RadarBlockEntity radar =
-                findNearestRadar(
-                        level,
-                        launcherPos
-                );
-
-        if (radar == null) {
-            return;
-        }
-
-        LivingEntity target =
-                radar.getTarget(level);
+        LivingEntity target = findBestAvailableTarget(
+                level,
+                launcherPos
+        );
 
         if (target == null) {
             return;
         }
 
-        if (!TargetRules.isValidTarget(
-                level,
-                target
-        )) {
+        if (
+                !TargetReservationRegistry.tryReserve(
+                        level,
+                        target.getUUID(),
+                        launcherPos
+                )
+        ) {
             return;
         }
 
         preparing = true;
-
         preparationTimer = 0;
+        activeTargetUuid = target.getUUID();
 
-        activeRadar = radar;
-
-        activeTargetUuid =
-                target.getUUID();
-
-        updateLastKnownPosition(
-                target
-        );
-
+        updateLastKnownPosition(level, target);
         playStaticSound(level);
 
         FieldEngineering.LOGGER.info(
                 "Launcher at {} started missile ignition against {}",
                 launcherPos,
-                target.getName()
-                        .getString()
+                target.getName().getString()
         );
     }
 
-    private void tickPreparation(
-            ServerLevel level
+    private LivingEntity findBestAvailableTarget(
+            ServerLevel level,
+            BlockPos launcherPos
     ) {
-        LivingEntity target =
-                getActiveTarget(level);
+        List<RadarBlockEntity> radars =
+                RadarRegistry.findWithinHorizontalRange(
+                        level,
+                        launcherPos,
+                        RADAR_SEARCH_RANGE
+                );
 
-        if (target != null) {
-            updateLastKnownPosition(
-                    target
-            );
+        if (radars.isEmpty()) {
+            return null;
         }
 
-        /*
-         * Se morreu durante a preparação,
-         * ainda conseguimos lançar contra a última posição.
-         */
-        if (
-                target == null
-                        && !hasLastTargetPosition
-        ) {
+        Set<UUID> seenTargets = new HashSet<>();
+
+        LivingEntity nearestAirTarget = null;
+        double nearestAirDistanceSqr = Double.MAX_VALUE;
+
+        LivingEntity nearestGroundTarget = null;
+        double nearestGroundDistanceSqr = Double.MAX_VALUE;
+
+        double launcherX = launcherPos.getX() + 0.5;
+        double launcherY = launcherPos.getY() + 0.5;
+        double launcherZ = launcherPos.getZ() + 0.5;
+
+        for (RadarBlockEntity radar : radars) {
+            for (LivingEntity target : radar.getDetectedTargets(level)) {
+                UUID targetUuid = target.getUUID();
+
+                if (!seenTargets.add(targetUuid)) {
+                    continue;
+                }
+
+                if (!TargetRules.isValidTarget(level, target)) {
+                    continue;
+                }
+
+                if (
+                        TargetReservationRegistry.isReservedByAnother(
+                                level,
+                                targetUuid,
+                                launcherPos
+                        )
+                ) {
+                    continue;
+                }
+
+                double distanceSqr = target.distanceToSqr(
+                        launcherX,
+                        launcherY,
+                        launcherZ
+                );
+
+                if (TargetRules.isAirTarget(level, target)) {
+                    if (distanceSqr < nearestAirDistanceSqr) {
+                        nearestAirDistanceSqr = distanceSqr;
+                        nearestAirTarget = target;
+                    }
+                } else if (distanceSqr < nearestGroundDistanceSqr) {
+                    nearestGroundDistanceSqr = distanceSqr;
+                    nearestGroundTarget = target;
+                }
+            }
+        }
+
+        return nearestAirTarget != null
+                ? nearestAirTarget
+                : nearestGroundTarget;
+    }
+
+    private void tickPreparation(ServerLevel level) {
+        LivingEntity target = getActiveTarget(level);
+
+        if (target != null) {
+            updateLastKnownPosition(level, target);
+        }
+
+        if (target == null && !hasLastTargetPosition) {
             cancelPreparation();
             return;
         }
 
         preparationTimer++;
-
         spawnPreparationParticles(level);
 
-        if (
-                preparationTimer
-                        < PREPARATION_TICKS
-        ) {
+        if (preparationTimer < PREPARATION_TICKS) {
             return;
         }
 
         launchAscendingMissile(level);
     }
 
-    private void launchAscendingMissile(
-            ServerLevel level
-    ) {
+    private void launchAscendingMissile(ServerLevel level) {
         spawnLaunchBurst(level);
-
         playLaunchSound(level);
-
         spawnAscendingMissile(level);
 
         preparing = false;
-
         preparationTimer = 0;
-
         strikeTimer = 0;
-
         impactPositionLocked = false;
-
         descendingMissileSpawned = false;
-
         lockedTargetWasAirborne = false;
-
-        cooldownTimer =
-                COOLDOWN_TICKS;
+        cooldownTimer = COOLDOWN_TICKS;
 
         FieldEngineering.LOGGER.info(
                 "Missile launched from {}",
@@ -247,102 +263,57 @@ public class LauncherBlockEntity extends BlockEntity {
         );
     }
 
-    private void tickStrikeSequence(
-            ServerLevel level
-    ) {
-        /*
-         * Até o momento do lock,
-         * continuamos atualizando a posição.
-         */
+    private void tickStrikeSequence(ServerLevel level) {
         if (!impactPositionLocked) {
-            LivingEntity target =
-                    getActiveTarget(level);
+            LivingEntity target = getActiveTarget(level);
 
             if (target != null) {
-                updateLastKnownPosition(
-                        target
-                );
+                updateLastKnownPosition(level, target);
             }
         }
 
         strikeTimer++;
 
-        int lockTick =
-                ASCENT_TICKS
-                        + POST_ASCENT_WAIT_TICKS;
+        int lockTick = ASCENT_TICKS + POST_ASCENT_WAIT_TICKS;
 
-        if (
-                !impactPositionLocked
-                        && strikeTimer >= lockTick
-        ) {
-            lockImpactPosition(level);
+        if (!impactPositionLocked && strikeTimer >= lockTick) {
+            lockImpactPosition();
         }
 
         if (!impactPositionLocked) {
             return;
         }
 
-        int delayAfterLock =
-                lockedTargetWasAirborne
-                        ? AIR_LOCK_TO_DESCENT_TICKS
-                        : GROUND_LOCK_TO_DESCENT_TICKS;
+        int delayAfterLock = lockedTargetWasAirborne
+                ? AIR_LOCK_TO_DESCENT_TICKS
+                : GROUND_LOCK_TO_DESCENT_TICKS;
 
-        int descentSpawnTick =
-                lockTick
-                        + delayAfterLock;
+        int descentSpawnTick = lockTick + delayAfterLock;
 
-        if (
-                !descendingMissileSpawned
-                        && strikeTimer >= descentSpawnTick
-        ) {
+        if (!descendingMissileSpawned && strikeTimer >= descentSpawnTick) {
             descendingMissileSpawned = true;
-
             spawnDescendingMissile(level);
-
             playExplosionSequenceSound(level);
         }
 
-        int sequenceEndTick =
-                descentSpawnTick
-                        + DESCENT_TICKS;
+        int sequenceEndTick = descentSpawnTick + DESCENT_TICKS;
 
-        if (
-                descendingMissileSpawned
-                        && strikeTimer >= sequenceEndTick
-        ) {
+        if (descendingMissileSpawned && strikeTimer >= sequenceEndTick) {
             finishStrikeSequence();
         }
     }
 
-    private void lockImpactPosition(
-            ServerLevel level
-    ) {
+    private void lockImpactPosition() {
         if (!hasLastTargetPosition) {
             cancelStrikeSequence();
             return;
         }
 
-        LivingEntity target =
-                getActiveTarget(level);
-
-        /*
-         * Se ainda está vivo no momento do lock,
-         * determinamos se ele é aéreo.
-         *
-         * Se morreu antes, usamos a última posição
-         * e tratamos como terrestre por segurança.
-         */
-        lockedTargetWasAirborne =
-                target != null
-                        && TargetRules.isAirTarget(
-                        level,
-                        target
-                );
+        lockedTargetWasAirborne = lastTargetWasAirborne;
 
         impactX = lastTargetX;
         impactY = lastTargetY;
         impactZ = lastTargetZ;
-
         impactPositionLocked = true;
 
         FieldEngineering.LOGGER.info(
@@ -355,43 +326,29 @@ public class LauncherBlockEntity extends BlockEntity {
     }
 
     private void updateLastKnownPosition(
+            ServerLevel level,
             LivingEntity target
     ) {
-        lastTargetX =
-                target.getX();
-
-        lastTargetY =
-                target.getY()
-                        + target.getBbHeight()
-                        * 0.5;
-
-        lastTargetZ =
-                target.getZ();
-
+        lastTargetX = target.getX();
+        lastTargetY = target.getY() + target.getBbHeight() * 0.5;
+        lastTargetZ = target.getZ();
+        lastTargetWasAirborne = TargetRules.isAirTarget(level, target);
         hasLastTargetPosition = true;
     }
 
-    private void spawnDescendingMissile(
-            ServerLevel level
-    ) {
-        double maxSpawnY =
-                level.getMaxBuildHeight()
-                        - 2;
+    private void spawnDescendingMissile(ServerLevel level) {
+        double maxSpawnY = level.getMaxBuildHeight() - 2;
+        double spawnY = Math.min(
+                impactY + DESCENT_HEIGHT,
+                maxSpawnY
+        );
 
-        double spawnY =
-                Math.min(
-                        impactY
-                                + DESCENT_HEIGHT,
-                        maxSpawnY
-                );
-
-        MissileEntity missile =
-                new MissileEntity(
-                        level,
-                        impactX,
-                        spawnY,
-                        impactZ
-                );
+        MissileEntity missile = new MissileEntity(
+                level,
+                impactX,
+                spawnY,
+                impactZ
+        );
 
         missile.configureDescending(
                 impactX,
@@ -402,9 +359,7 @@ public class LauncherBlockEntity extends BlockEntity {
                 impactZ
         );
 
-        level.addFreshEntity(
-                missile
-        );
+        level.addFreshEntity(missile);
 
         FieldEngineering.LOGGER.info(
                 "Descending missile spawned above X={} Y={} Z={}",
@@ -414,9 +369,7 @@ public class LauncherBlockEntity extends BlockEntity {
         );
     }
 
-    private void playStaticSound(
-            ServerLevel level
-    ) {
+    private void playStaticSound(ServerLevel level) {
         level.playSound(
                 null,
                 worldPosition,
@@ -427,9 +380,7 @@ public class LauncherBlockEntity extends BlockEntity {
         );
     }
 
-    private void playLaunchSound(
-            ServerLevel level
-    ) {
+    private void playLaunchSound(ServerLevel level) {
         level.playSound(
                 null,
                 worldPosition,
@@ -440,15 +391,12 @@ public class LauncherBlockEntity extends BlockEntity {
         );
     }
 
-    private void playExplosionSequenceSound(
-            ServerLevel level
-    ) {
-        BlockPos soundPosition =
-                BlockPos.containing(
-                        impactX,
-                        impactY,
-                        impactZ
-                );
+    private void playExplosionSequenceSound(ServerLevel level) {
+        BlockPos soundPosition = BlockPos.containing(
+                impactX,
+                impactY,
+                impactZ
+        );
 
         level.playSound(
                 null,
@@ -460,67 +408,39 @@ public class LauncherBlockEntity extends BlockEntity {
         );
     }
 
-    private void spawnAscendingMissile(
-            ServerLevel level
-    ) {
-        double x =
-                worldPosition.getX()
-                        + 0.5;
+    private void spawnAscendingMissile(ServerLevel level) {
+        double x = worldPosition.getX() + 0.5;
+        double y = worldPosition.getY() + 1.2;
+        double z = worldPosition.getZ() + 0.5;
 
-        double y =
-                worldPosition.getY()
-                        + 1.2;
-
-        double z =
-                worldPosition.getZ()
-                        + 0.5;
-
-        MissileEntity missile =
-                new MissileEntity(
-                        level,
-                        x,
-                        y,
-                        z
-                );
-
-        level.addFreshEntity(
-                missile
+        MissileEntity missile = new MissileEntity(
+                level,
+                x,
+                y,
+                z
         );
+
+        level.addFreshEntity(missile);
     }
 
-    private void spawnPreparationParticles(
-            ServerLevel level
-    ) {
-        double progress =
-                (double) preparationTimer
-                        / PREPARATION_TICKS;
+    private void spawnPreparationParticles(ServerLevel level) {
+        double progress = (double) preparationTimer / PREPARATION_TICKS;
 
         int particleCount;
 
         if (progress < 0.25) {
             particleCount = 8;
-
         } else if (progress < 0.50) {
             particleCount = 18;
-
         } else if (progress < 0.75) {
             particleCount = 35;
-
         } else {
             particleCount = 60;
         }
 
-        double x =
-                worldPosition.getX()
-                        + 0.5;
-
-        double y =
-                worldPosition.getY()
-                        + 0.9;
-
-        double z =
-                worldPosition.getZ()
-                        + 0.5;
+        double x = worldPosition.getX() + 0.5;
+        double y = worldPosition.getY() + 0.9;
+        double z = worldPosition.getZ() + 0.5;
 
         level.sendParticles(
                 ParticleTypes.FIREWORK,
@@ -539,10 +459,7 @@ public class LauncherBlockEntity extends BlockEntity {
                 x,
                 y,
                 z,
-                Math.max(
-                        1,
-                        particleCount / 2
-                ),
+                Math.max(1, particleCount / 2),
                 1.2,
                 0.25,
                 1.2,
@@ -550,20 +467,10 @@ public class LauncherBlockEntity extends BlockEntity {
         );
     }
 
-    private void spawnLaunchBurst(
-            ServerLevel level
-    ) {
-        double x =
-                worldPosition.getX()
-                        + 0.5;
-
-        double y =
-                worldPosition.getY()
-                        + 1.1;
-
-        double z =
-                worldPosition.getZ()
-                        + 0.5;
+    private void spawnLaunchBurst(ServerLevel level) {
+        double x = worldPosition.getX() + 0.5;
+        double y = worldPosition.getY() + 1.1;
+        double z = worldPosition.getZ() + 0.5;
 
         level.sendParticles(
                 ParticleTypes.FIREWORK,
@@ -614,17 +521,12 @@ public class LauncherBlockEntity extends BlockEntity {
         );
     }
 
-    private LivingEntity getActiveTarget(
-            ServerLevel level
-    ) {
+    private LivingEntity getActiveTarget(ServerLevel level) {
         if (activeTargetUuid == null) {
             return null;
         }
 
-        Entity entity =
-                level.getEntity(
-                        activeTargetUuid
-                );
+        Entity entity = level.getEntity(activeTargetUuid);
 
         if (
                 entity instanceof LivingEntity livingEntity
@@ -637,77 +539,59 @@ public class LauncherBlockEntity extends BlockEntity {
     }
 
     private void cancelPreparation() {
+        releaseActiveReservation();
+
         preparing = false;
-
         preparationTimer = 0;
-
-        activeRadar = null;
-
         activeTargetUuid = null;
-
         hasLastTargetPosition = false;
+        lastTargetWasAirborne = false;
     }
 
     private void cancelStrikeSequence() {
+        releaseActiveReservation();
+
         strikeTimer = -1;
-
         impactPositionLocked = false;
-
         descendingMissileSpawned = false;
-
-        activeRadar = null;
-
         activeTargetUuid = null;
-
         hasLastTargetPosition = false;
+        lastTargetWasAirborne = false;
     }
 
     private void finishStrikeSequence() {
+        releaseActiveReservation();
+
         strikeTimer = -1;
-
         impactPositionLocked = false;
-
         descendingMissileSpawned = false;
-
-        activeRadar = null;
-
         activeTargetUuid = null;
-
         hasLastTargetPosition = false;
+        lastTargetWasAirborne = false;
     }
 
-    private RadarBlockEntity findNearestRadar(
-            ServerLevel level,
-            BlockPos launcherPos
-    ) {
-        AABB area =
-                new AABB(launcherPos)
-                        .inflate(
-                                RADAR_SEARCH_RANGE
-                        );
+    private void releaseActiveReservation() {
+        if (
+                activeTargetUuid != null
+                        && getLevel() instanceof ServerLevel serverLevel
+        ) {
+            TargetReservationRegistry.release(
+                    serverLevel,
+                    activeTargetUuid,
+                    worldPosition
+            );
+        }
+    }
 
-        List<RadarBlockEntity> radars =
-                BlockEntitySearch.findBlockEntities(
-                        level,
-                        area,
-                        RadarBlockEntity.class
-                );
+    @Override
+    public void setRemoved() {
+        if (getLevel() instanceof ServerLevel serverLevel) {
+            TargetReservationRegistry.releaseAllForLauncher(
+                    serverLevel,
+                    worldPosition
+            );
+        }
 
-        return radars.stream()
-                .filter(
-                        radar ->
-                                radar.getTarget(level)
-                                        != null
-                )
-                .min(
-                        Comparator.comparingDouble(
-                                radar ->
-                                        radar.getBlockPos()
-                                                .distSqr(
-                                                        launcherPos
-                                                )
-                        )
-                )
-                .orElse(null);
+        super.setRemoved();
     }
 }
