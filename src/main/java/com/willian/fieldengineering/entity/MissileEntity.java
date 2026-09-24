@@ -1,0 +1,262 @@
+package com.willian.fieldengineering.entity;
+
+import com.willian.fieldengineering.registry.ModEntities;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+
+public class MissileEntity extends ThrowableItemProjectile {
+
+    private static final double ASCENT_SPEED = 1.8;
+
+    // 2 segundos.
+    private static final int ASCENT_TICKS = 40;
+
+    // 0,9 segundos.
+    private static final int DESCENT_TICKS = 18;
+
+    private boolean descending = false;
+
+    private double impactX;
+    private double impactY;
+    private double impactZ;
+
+    private double descentStartX;
+    private double descentStartY;
+    private double descentStartZ;
+
+    public MissileEntity(
+            EntityType<? extends ThrowableItemProjectile> type,
+            Level level
+    ) {
+        super(type, level);
+
+        configureVisual();
+    }
+
+    public MissileEntity(
+            Level level,
+            double x,
+            double y,
+            double z
+    ) {
+        super(
+                ModEntities.MISSILE,
+                x,
+                y,
+                z,
+                level
+        );
+
+        configureVisual();
+
+        this.descending = false;
+
+        this.setNoGravity(true);
+
+        this.setDeltaMovement(
+                0.0,
+                ASCENT_SPEED,
+                0.0
+        );
+    }
+
+    private void configureVisual() {
+        this.setItem(
+                new ItemStack(
+                        Items.FIREWORK_ROCKET
+                )
+        );
+    }
+
+    public void configureDescending(
+            double startX,
+            double startY,
+            double startZ,
+            double impactX,
+            double impactY,
+            double impactZ
+    ) {
+        this.descending = true;
+
+        this.descentStartX = startX;
+        this.descentStartY = startY;
+        this.descentStartZ = startZ;
+
+        this.impactX = impactX;
+        this.impactY = impactY;
+        this.impactZ = impactZ;
+
+        this.setPos(
+                startX,
+                startY,
+                startZ
+        );
+
+        this.setNoGravity(true);
+
+        updateDescendingVelocity();
+    }
+
+    @Override
+    protected Item getDefaultItem() {
+        return Items.FIREWORK_ROCKET;
+    }
+
+    @Override
+    public void tick() {
+        if (level() instanceof ServerLevel) {
+
+            if (descending) {
+                updateDescendingVelocity();
+            } else {
+                this.setNoGravity(true);
+
+                this.setDeltaMovement(
+                        0.0,
+                        ASCENT_SPEED,
+                        0.0
+                );
+            }
+        }
+
+        super.tick();
+
+        if (!(level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+
+        if (descending) {
+            tickDescending(serverLevel);
+        } else {
+            tickAscending(serverLevel);
+        }
+    }
+
+    private void tickAscending(
+            ServerLevel level
+    ) {
+        spawnTrail(level);
+
+        if (this.tickCount >= ASCENT_TICKS) {
+            this.discard();
+        }
+    }
+
+    private void tickDescending(
+            ServerLevel level
+    ) {
+        spawnTrail(level);
+
+        if (this.tickCount < DESCENT_TICKS) {
+            return;
+        }
+
+        /*
+         * Garante que a explosão realmente aconteça
+         * exatamente na coordenada travada.
+         */
+        this.setPos(
+                impactX,
+                impactY,
+                impactZ
+        );
+
+        explode(level);
+    }
+
+    private void updateDescendingVelocity() {
+        /*
+         * Queremos percorrer a distância total
+         * exatamente em 18 ticks.
+         */
+        double velocityX =
+                (impactX - descentStartX)
+                        / DESCENT_TICKS;
+
+        double velocityY =
+                (impactY - descentStartY)
+                        / DESCENT_TICKS;
+
+        double velocityZ =
+                (impactZ - descentStartZ)
+                        / DESCENT_TICKS;
+
+        this.setNoGravity(true);
+
+        this.setDeltaMovement(
+                velocityX,
+                velocityY,
+                velocityZ
+        );
+    }
+
+    private void explode(
+            ServerLevel level
+    ) {
+        /*
+         * Explosão equivalente a TNT,
+         * mas sem interação destrutiva com blocos.
+         */
+        level.explode(
+                this,
+                impactX,
+                impactY,
+                impactZ,
+                4.0f,
+                false,
+                Level.ExplosionInteraction.NONE
+        );
+
+        this.discard();
+    }
+
+    private void spawnTrail(
+            ServerLevel level
+    ) {
+        double x = getX();
+        double y = getY();
+        double z = getZ();
+
+        level.sendParticles(
+                ParticleTypes.FIREWORK,
+                x,
+                y,
+                z,
+                40,
+                0.24,
+                0.32,
+                0.24,
+                0.045
+        );
+
+        level.sendParticles(
+                ParticleTypes.SMOKE,
+                x,
+                y,
+                z,
+                30,
+                0.30,
+                0.38,
+                0.30,
+                0.03
+        );
+
+        level.sendParticles(
+                ParticleTypes.FLAME,
+                x,
+                y,
+                z,
+                10,
+                0.12,
+                0.18,
+                0.12,
+                0.035
+        );
+    }
+}

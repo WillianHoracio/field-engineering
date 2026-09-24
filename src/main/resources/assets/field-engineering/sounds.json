@@ -1,0 +1,17 @@
+{
+  "missile_static": {
+    "sounds": [
+      "field-engineering:static"
+    ]
+  },
+  "missile_launch": {
+    "sounds": [
+      "field-engineering:launch"
+    ]
+  },
+  "missile_explosion": {
+    "sounds": [
+      "field-engineering:explosion"
+    ]
+  }
+}

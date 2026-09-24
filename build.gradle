@@ -1,0 +1,106 @@
+plugins {
+	id 'fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+repositories {
+	// Loom já adiciona os repositórios necessários
+	// para Minecraft e Fabric.
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	mods {
+		"field-engineering" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
+	mappings loom.officialMojangMappings()
+
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+	def modVersion = project.version
+
+	inputs.property "version", modVersion
+
+	filesMatching("fabric.mod.json") {
+		expand "version": modVersion
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+}
+
+java {
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+/*
+ * Guardamos o nome durante a configuração.
+ *
+ * Assim nenhuma closure das tasks precisa
+ * acessar "project" durante a execução.
+ */
+def projectNameForLicense = project.name
+
+/*
+ * JAR principal.
+ *
+ * Inclui explicitamente:
+ * - main
+ * - client
+ *
+ * Isso é importante porque estamos usando:
+ * splitEnvironmentSourceSets()
+ */
+tasks.named("jar", Jar) {
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+	from(sourceSets.main.output)
+	from(sourceSets.client.output)
+
+	if (file("LICENSE").exists()) {
+		from("LICENSE") {
+			rename {
+				"${it}_${projectNameForLicense}"
+			}
+		}
+	}
+}
+
+/*
+ * JAR de código fonte.
+ */
+tasks.named("sourcesJar", Jar) {
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+	from(sourceSets.main.allSource)
+	from(sourceSets.client.allSource)
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+
+	repositories {
+		// Adicionar repositório futuramente se necessário.
+	}
+}

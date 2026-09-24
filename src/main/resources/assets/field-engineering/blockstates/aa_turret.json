@@ -1,0 +1,19 @@
+{
+	"variants": {
+		"facing=north": {
+			"model": "field-engineering:block/aa_turret"
+		},
+		"facing=east": {
+			"model": "field-engineering:block/aa_turret",
+			"y": 90
+		},
+		"facing=south": {
+			"model": "field-engineering:block/aa_turret",
+			"y": 180
+		},
+		"facing=west": {
+			"model": "field-engineering:block/aa_turret",
+			"y": 270
+		}
+	}
+}

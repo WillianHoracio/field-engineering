@@ -1,0 +1,6 @@
+{
+  "item.field-engineering.aa_missile": "Missile",
+  "block.field-engineering.aa_turret": "Missile Launcher",
+  "block.field-engineering.radar": "Military Radar",
+  "itemGroup.field-engineering": "Field Engineering"
+}
