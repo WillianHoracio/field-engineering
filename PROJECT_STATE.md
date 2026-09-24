@@ -18,7 +18,7 @@ Update this file whenever a meaningful feature is completed, removed, or changes
 fix/issue-2-missile-long-range-visuals
 ```
 
-The branch was reset to `main` after the previous tracking/remote-visual experiments did not improve the real result. The current approach is intentionally minimal and keeps the original missile simulation intact.
+The branch was reset to `main` after the previous tracking/remote-visual experiments did not improve the real result. The current approach keeps the original simulation model but extends the visible flight envelope and uses a dedicated renderer for long-range readability.
 
 ## Implemented
 
@@ -46,7 +46,8 @@ The branch was reset to `main` after the previous tracking/remote-visual experim
 - Within a priority class, the closest available target is selected.
 - Target reservation prevents multiple launchers from wasting missiles on the same entity.
 - Preparation smoke and launch effects.
-- Ascending missile visual.
+- Ascending missile persists until the descending phase actually begins.
+- Launcher stores the ascending missile UUID and discards it on descent/cancel/removal.
 - Delayed strike phase.
 - Last-known target coordinates.
 - Last-known air/ground state survives target death before lock.
@@ -55,14 +56,30 @@ The branch was reset to `main` after the previous tracking/remote-visual experim
 
 ### Missile
 
-- Original ascending and descending server behavior preserved from `main`.
+- Ascending missile no longer despawns after 40 ticks.
+- It continues upward at 1.8 blocks/tick until `maxBuildHeight - 2` and then waits there until descent begins.
+- Descending missile now spawns at `maxBuildHeight - 2` instead of 90 blocks above impact.
+- Descent still lasts exactly 18 ticks; velocity increases automatically to cover the larger distance.
+- Final impact is still snapped to the locked coordinate before explosion, preserving precision.
 - Original close-range firework/smoke/flame particles preserved.
 - Custom client renderer replaces the plain `ThrownItemRenderer`.
 - Vanilla firework body is rendered at 2x visual scale for readability.
 - Renderer adds a layered 8-block velocity-aligned trail directly in the render pipeline.
+- The renderer preserves a vertical trail when the ascending missile is stationary at the world ceiling.
 - The direct trail does not use the vanilla particle system and therefore is not subject to particle render-distance limits.
-- Positional launch/impact flow remains unchanged.
 - Explosion damages entities without terrain destruction.
+
+### Timing
+
+The strike timing itself is unchanged from the validated baseline:
+
+```text
+launch -> 180 ticks (9.0 s) -> target lock / air descent
+                         +22 ticks (1.1 s) -> ground descent
+                         +18 ticks (0.9 s) -> impact after descent begins
+```
+
+The 180 ticks are the previous 40-tick ascent phase plus the 140-tick (7 second) post-ascent wait. The visual ascent now fills that previously empty interval instead of disappearing after 2 seconds.
 
 ### Audio
 
@@ -89,13 +106,19 @@ Real-world testing showed no useful improvement, and the second approach made th
 
 1. confirm the close-range launch still looks and behaves like `main`;
 2. verify the vanilla rocket body is visibly larger but still recognizable;
-3. observe the missile at increasing distance and verify the direct trail remains visible after vanilla particles disappear;
-4. test both ascending and descending missiles;
-5. confirm there is no altered timing, impact point, damage, audio, or target reservation behavior;
-6. fire several missiles and check client FPS.
+3. confirm the ascending missile stays visible beyond the old 40-tick despawn point;
+4. confirm it reaches the world ceiling and remains there until descent begins;
+5. observe the missile at increasing distance and verify the direct trail remains visible after vanilla particles disappear;
+6. test both air-target and ground-target timing;
+7. verify the descending missile starts at world ceiling and still impacts exactly after 18 ticks;
+8. verify impact point, damage, audio, and target reservation behavior are unchanged;
+9. fire several missiles and check client FPS/server responsiveness.
 
 Watch specifically for:
 
+- ascending missile disappearing before descent begins;
+- unexpected overlap between ascending and descending missiles;
+- descending missile missing its locked impact point;
 - trail disappearing at the same distance as vanilla particles;
 - trail not aligning with missile movement;
 - line width behaving differently with Sodium/Iris/shaders;
@@ -109,7 +132,7 @@ Watch specifically for:
 - The new direct trail still depends on the missile entity itself being rendered; current testing indicates the entity remains visible farther than the particles.
 - Missile model replacement/refinement is deferred to a separate future PR.
 - PvE is the priority; multiplayer is not currently a design target.
-- Existing missile timing/feel should not be casually changed.
+- Existing lock/descent timing is intentionally preserved even though the visible ascent now lasts longer.
 - World-generation changes should avoid visible seams in already-generated large worlds.
 - Integrations should avoid hard dependencies on another mod's internals when a robust generic rule is sufficient.
 - The user owns gameplay/system design decisions. Code should implement those decisions rather than silently redefining them.
