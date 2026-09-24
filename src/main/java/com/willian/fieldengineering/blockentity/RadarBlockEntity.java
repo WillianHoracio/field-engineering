@@ -14,7 +14,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -92,21 +91,32 @@ public class RadarBlockEntity extends BlockEntity {
                         )
                 );
 
-        targets.sort(
-                Comparator.comparingDouble(
-                        entity -> entity.distanceToSqr(
-                                worldPosition.getX() + 0.5,
-                                worldPosition.getY() + 0.5,
-                                worldPosition.getZ() + 0.5
-                        )
-                )
-        );
-
         cachedTargetUuids.clear();
+
+        LivingEntity nearestTarget = null;
+        double nearestDistanceSqr = Double.MAX_VALUE;
 
         for (LivingEntity target : targets) {
             cachedTargetUuids.add(target.getUUID());
-            showTargetParticles(level, target);
+
+            double distanceSqr = target.distanceToSqr(
+                    worldPosition.getX() + 0.5,
+                    worldPosition.getY() + 0.5,
+                    worldPosition.getZ() + 0.5
+            );
+
+            if (distanceSqr < nearestDistanceSqr) {
+                nearestDistanceSqr = distanceSqr;
+                nearestTarget = target;
+            }
+        }
+
+        /*
+         * Mantem o feedback visual de debug sem multiplicar particulas
+         * pela quantidade de alvos detectados.
+         */
+        if (nearestTarget != null) {
+            showTargetParticles(level, nearestTarget);
         }
     }
 
