@@ -101,13 +101,18 @@ A target can be reserved by only one launcher at a time. Other launchers move to
 ```text
 t = 0      static sound + preparation smoke
 t = 80     launch burst + launch sound + ascending missile
-t = 120    ascending visual missile is gone
+           ascending missile keeps climbing toward world ceiling
+           if it reaches the ceiling first, it remains there visibly
 t = 260    lock target / last known position
-             ground target: wait 22 ticks
-             air target: no additional wait
-spawn descending missile + explosion sound
+             air target: replace ascent with descending missile immediately
+             ground target: wait 22 additional ticks, then replace it
+spawn descending missile at world ceiling + explosion sound
 after 18 descending ticks: explosion at locked coordinate
 ```
+
+The historical strike timing is preserved: the old 40-tick ascent phase plus 140-tick wait still defines the 180-tick launch-to-lock interval. The difference is visual continuity: the ascending missile is no longer discarded after 40 ticks. The launcher owns its UUID and removes it exactly when the descending phase begins or when the strike is cancelled.
+
+The descending missile now starts at `maxBuildHeight - 2` rather than a fixed 90 blocks above the target. Its velocity is calculated from the full ceiling-to-impact distance so it still reaches the locked coordinate in 18 ticks. The final position is snapped to the authoritative impact coordinate before explosion, preserving precision.
 
 The explosion damages entities and causes knockback but does not destroy terrain.
 
@@ -123,11 +128,13 @@ client/render/MissileRenderer.java
 
 Responsibilities:
 
-- preserve the existing server-authoritative ascending and descending missile entity;
+- preserve the server-authoritative ascending and descending missile entity;
+- allow ascent to continue to the world ceiling instead of self-despawning after two seconds;
 - keep the approved firework/smoke/flame particles for close-range detail;
 - render the vanilla firework body at a larger client-side scale for readability;
 - render a direct client-side layered trail from missile velocity, independent of the vanilla particle-distance limit;
-- impact at the locked coordinate;
+- preserve a vertical trail while an ascending missile is waiting at the world ceiling;
+- descend from the world ceiling to the exact locked coordinate in the existing 18-tick descent window;
 - vanilla explosion with terrain destruction disabled.
 
 The direct trail is part of the entity renderer rather than a particle stream. This means the long-range readability layer follows the missile whenever the entity itself is rendered, while the existing particles remain a local-detail effect.
