@@ -101,33 +101,46 @@ A target can be reserved by only one launcher at a time. Other launchers move to
 ```text
 t = 0      static sound + preparation smoke
 t = 80     launch burst + launch sound + ascending missile
-t = 120    ascending visual missile is gone
+           ascending missile keeps climbing toward world ceiling
+           if it reaches the ceiling first, it remains there visibly
 t = 260    lock target / last known position
-             ground target: wait 22 ticks
-             air target: no additional wait
-spawn descending missile + explosion sound
+             air target: replace ascent with descending missile immediately
+             ground target: wait 22 additional ticks, then replace it
+spawn descending missile at world ceiling + explosion sound
 after 18 descending ticks: explosion at locked coordinate
 ```
+
+The historical strike timing is preserved: the old 40-tick ascent phase plus 140-tick wait still defines the 180-tick launch-to-lock interval. The difference is visual continuity: the ascending missile is no longer discarded after 40 ticks. The launcher owns its UUID and removes it exactly when the descending phase begins or when the strike is cancelled.
+
+The descending missile now starts at `maxBuildHeight - 2` rather than a fixed 90 blocks above the target. Its velocity is calculated from the full ceiling-to-impact distance so it still reaches the locked coordinate in 18 ticks. The final position is snapped to the authoritative impact coordinate before explosion, preserving precision.
 
 The explosion damages entities and causes knockback but does not destroy terrain.
 
 The launcher tracks the active target and continuously stores its last known coordinates before lock so a strike can complete after target loss/death. Air/ground state is also stored with the last-known target state, so a target that dies before lock keeps the correct descent timing.
 
-### Missile entity
-Primary file:
+### Missile entity and renderer
+Primary files:
 
 ```text
 entity/MissileEntity.java
+client/render/MissileRenderer.java
 ```
 
 Responsibilities:
 
-- render as a projectile entity;
-- ascending visual phase;
-- descending visual phase;
-- dense firework/smoke/flame trail;
-- impact at the locked coordinate;
+- preserve the server-authoritative ascending and descending missile entity;
+- allow ascent to continue to the world ceiling instead of self-despawning after two seconds;
+- keep the approved firework/smoke/flame particles for close-range detail;
+- render the vanilla firework body at a larger client-side scale for readability;
+- render a direct client-side layered trail from missile velocity, independent of the vanilla particle-distance limit;
+- preserve a vertical trail while a missile is stationary at the world ceiling without relying on unsynchronized server-only state;
+- explicitly allow missile rendering up to 1024 blocks through `shouldRenderAtSqrDistance`;
+- descend from the world ceiling to the exact locked coordinate in the existing 18-tick descent window;
 - vanilla explosion with terrain destruction disabled.
+
+The direct trail is part of the entity renderer rather than a particle stream. This means the long-range readability layer follows the missile whenever the entity itself is rendered, while the existing particles remain a local-detail effect.
+
+Diagnostic testing showed that increasing entity tracking range did not change the disappearance point, while forcing `shouldRenderAtSqrDistance` to accept the entity kept the full trajectory visible. The final implementation therefore restores the normal 10-chunk tracking range and uses a bounded 1024-block render-distance override instead of extending tracking globally.
 
 Current missile ownership is not attributed to the player. Player kill credit is a future requirement.
 
@@ -184,6 +197,8 @@ lifecycle/event -> registry/index -> cheap mathematical filter -> resolve only r
 ```
 
 For periodic systems, spread work across time and cache shared results rather than making every instance independently repeat the same query.
+
+For missile visuals, prefer a bounded render-time effect derived from already-synchronized entity velocity over increasing continuous server particle traffic or extending entity tracking beyond what gameplay requires.
 
 ## Planned systems
 

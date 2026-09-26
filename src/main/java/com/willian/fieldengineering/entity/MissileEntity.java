@@ -13,14 +13,13 @@ import net.minecraft.world.level.Level;
 public class MissileEntity extends ThrowableItemProjectile {
 
     private static final double ASCENT_SPEED = 1.8;
-
-    // 2 segundos.
-    private static final int ASCENT_TICKS = 40;
+    private static final double MAX_RENDER_DISTANCE = 1024.0;
 
     // 0,9 segundos.
     private static final int DESCENT_TICKS = 18;
 
     private boolean descending = false;
+    private double ascentCeilingY = Double.POSITIVE_INFINITY;
 
     private double impactX;
     private double impactY;
@@ -74,6 +73,10 @@ public class MissileEntity extends ThrowableItemProjectile {
         );
     }
 
+    public void configureAscendingCeiling(double maxY) {
+        this.ascentCeilingY = maxY;
+    }
+
     public void configureDescending(
             double startX,
             double startY,
@@ -84,8 +87,10 @@ public class MissileEntity extends ThrowableItemProjectile {
     ) {
         this.descending = true;
 
+        double highestSpawnY = level().getMaxBuildHeight() - 2.0;
+
         this.descentStartX = startX;
-        this.descentStartY = startY;
+        this.descentStartY = Math.max(startY, highestSpawnY);
         this.descentStartZ = startZ;
 
         this.impactX = impactX;
@@ -93,9 +98,9 @@ public class MissileEntity extends ThrowableItemProjectile {
         this.impactZ = impactZ;
 
         this.setPos(
-                startX,
-                startY,
-                startZ
+                descentStartX,
+                descentStartY,
+                descentStartZ
         );
 
         this.setNoGravity(true);
@@ -109,19 +114,18 @@ public class MissileEntity extends ThrowableItemProjectile {
     }
 
     @Override
+    public boolean shouldRenderAtSqrDistance(double distance) {
+        return distance <= MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
+    }
+
+    @Override
     public void tick() {
         if (level() instanceof ServerLevel) {
 
             if (descending) {
                 updateDescendingVelocity();
             } else {
-                this.setNoGravity(true);
-
-                this.setDeltaMovement(
-                        0.0,
-                        ASCENT_SPEED,
-                        0.0
-                );
+                updateAscendingVelocity();
             }
         }
 
@@ -138,14 +142,56 @@ public class MissileEntity extends ThrowableItemProjectile {
         }
     }
 
+    private void updateAscendingVelocity() {
+        this.setNoGravity(true);
+
+        if (getY() >= ascentCeilingY) {
+            this.setPos(
+                    getX(),
+                    ascentCeilingY,
+                    getZ()
+            );
+
+            this.setDeltaMovement(
+                    0.0,
+                    0.0,
+                    0.0
+            );
+
+            return;
+        }
+
+        double remainingHeight = ascentCeilingY - getY();
+        double velocityY = Math.min(
+                ASCENT_SPEED,
+                remainingHeight
+        );
+
+        this.setDeltaMovement(
+                0.0,
+                velocityY,
+                0.0
+        );
+    }
+
     private void tickAscending(
             ServerLevel level
     ) {
-        spawnTrail(level);
+        if (getY() > ascentCeilingY) {
+            this.setPos(
+                    getX(),
+                    ascentCeilingY,
+                    getZ()
+            );
 
-        if (this.tickCount >= ASCENT_TICKS) {
-            this.discard();
+            this.setDeltaMovement(
+                    0.0,
+                    0.0,
+                    0.0
+            );
         }
+
+        spawnTrail(level);
     }
 
     private void tickDescending(
@@ -172,8 +218,8 @@ public class MissileEntity extends ThrowableItemProjectile {
 
     private void updateDescendingVelocity() {
         /*
-         * Queremos percorrer a distância total
-         * exatamente em 18 ticks.
+         * Percorre toda a distância desde o topo do mundo
+         * até a coordenada travada exatamente em 18 ticks.
          */
         double velocityX =
                 (impactX - descentStartX)

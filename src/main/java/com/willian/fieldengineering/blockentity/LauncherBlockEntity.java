@@ -39,7 +39,6 @@ public class LauncherBlockEntity extends BlockEntity {
     private static final int ACQUISITION_INTERVAL_TICKS = 100;
 
     private static final double RADAR_SEARCH_RANGE = 128.0;
-    private static final double DESCENT_HEIGHT = 90.0;
 
     private int preparationTimer = 0;
     private int cooldownTimer = 0;
@@ -48,6 +47,7 @@ public class LauncherBlockEntity extends BlockEntity {
 
     private boolean preparing = false;
     private UUID activeTargetUuid;
+    private UUID ascendingMissileUuid;
 
     private boolean impactPositionLocked = false;
     private boolean lockedTargetWasAirborne = false;
@@ -292,6 +292,7 @@ public class LauncherBlockEntity extends BlockEntity {
 
         if (!descendingMissileSpawned && strikeTimer >= descentSpawnTick) {
             descendingMissileSpawned = true;
+            discardAscendingMissile(level);
             spawnDescendingMissile(level);
             playExplosionSequenceSound(level);
         }
@@ -337,11 +338,7 @@ public class LauncherBlockEntity extends BlockEntity {
     }
 
     private void spawnDescendingMissile(ServerLevel level) {
-        double maxSpawnY = level.getMaxBuildHeight() - 2;
-        double spawnY = Math.min(
-                impactY + DESCENT_HEIGHT,
-                maxSpawnY
-        );
+        double spawnY = level.getMaxBuildHeight() - 2.0;
 
         MissileEntity missile = new MissileEntity(
                 level,
@@ -362,7 +359,7 @@ public class LauncherBlockEntity extends BlockEntity {
         level.addFreshEntity(missile);
 
         FieldEngineering.LOGGER.info(
-                "Descending missile spawned above X={} Y={} Z={}",
+                "Descending missile spawned from world ceiling above X={} Y={} Z={}",
                 impactX,
                 impactY,
                 impactZ
@@ -409,6 +406,8 @@ public class LauncherBlockEntity extends BlockEntity {
     }
 
     private void spawnAscendingMissile(ServerLevel level) {
+        discardAscendingMissile(level);
+
         double x = worldPosition.getX() + 0.5;
         double y = worldPosition.getY() + 1.2;
         double z = worldPosition.getZ() + 0.5;
@@ -420,7 +419,26 @@ public class LauncherBlockEntity extends BlockEntity {
                 z
         );
 
+        missile.configureAscendingCeiling(
+                level.getMaxBuildHeight() - 2.0
+        );
+
         level.addFreshEntity(missile);
+        ascendingMissileUuid = missile.getUUID();
+    }
+
+    private void discardAscendingMissile(ServerLevel level) {
+        if (ascendingMissileUuid == null) {
+            return;
+        }
+
+        Entity entity = level.getEntity(ascendingMissileUuid);
+
+        if (entity instanceof MissileEntity missile) {
+            missile.discard();
+        }
+
+        ascendingMissileUuid = null;
     }
 
     private void spawnPreparationParticles(ServerLevel level) {
@@ -551,6 +569,10 @@ public class LauncherBlockEntity extends BlockEntity {
     private void cancelStrikeSequence() {
         releaseActiveReservation();
 
+        if (getLevel() instanceof ServerLevel serverLevel) {
+            discardAscendingMissile(serverLevel);
+        }
+
         strikeTimer = -1;
         impactPositionLocked = false;
         descendingMissileSpawned = false;
@@ -561,6 +583,10 @@ public class LauncherBlockEntity extends BlockEntity {
 
     private void finishStrikeSequence() {
         releaseActiveReservation();
+
+        if (getLevel() instanceof ServerLevel serverLevel) {
+            discardAscendingMissile(serverLevel);
+        }
 
         strikeTimer = -1;
         impactPositionLocked = false;
@@ -586,6 +612,8 @@ public class LauncherBlockEntity extends BlockEntity {
     @Override
     public void setRemoved() {
         if (getLevel() instanceof ServerLevel serverLevel) {
+            discardAscendingMissile(serverLevel);
+
             TargetReservationRegistry.releaseAllForLauncher(
                     serverLevel,
                     worldPosition
