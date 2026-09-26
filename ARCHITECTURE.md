@@ -133,11 +133,14 @@ Responsibilities:
 - keep the approved firework/smoke/flame particles for close-range detail;
 - render the vanilla firework body at a larger client-side scale for readability;
 - render a direct client-side layered trail from missile velocity, independent of the vanilla particle-distance limit;
-- preserve a vertical trail while an ascending missile is waiting at the world ceiling;
+- preserve a vertical trail while a missile is stationary at the world ceiling without relying on unsynchronized server-only state;
+- explicitly allow missile rendering up to 1024 blocks through `shouldRenderAtSqrDistance`;
 - descend from the world ceiling to the exact locked coordinate in the existing 18-tick descent window;
 - vanilla explosion with terrain destruction disabled.
 
 The direct trail is part of the entity renderer rather than a particle stream. This means the long-range readability layer follows the missile whenever the entity itself is rendered, while the existing particles remain a local-detail effect.
+
+Diagnostic testing showed that increasing entity tracking range did not change the disappearance point, while forcing `shouldRenderAtSqrDistance` to accept the entity kept the full trajectory visible. The final implementation therefore restores the normal 10-chunk tracking range and uses a bounded 1024-block render-distance override instead of extending tracking globally.
 
 Current missile ownership is not attributed to the player. Player kill credit is a future requirement.
 
@@ -195,7 +198,7 @@ lifecycle/event -> registry/index -> cheap mathematical filter -> resolve only r
 
 For periodic systems, spread work across time and cache shared results rather than making every instance independently repeat the same query.
 
-For missile visuals, prefer a bounded render-time effect derived from already-synchronized entity velocity over increasing continuous server particle traffic.
+For missile visuals, prefer a bounded render-time effect derived from already-synchronized entity velocity over increasing continuous server particle traffic or extending entity tracking beyond what gameplay requires.
 
 ## Planned systems
 

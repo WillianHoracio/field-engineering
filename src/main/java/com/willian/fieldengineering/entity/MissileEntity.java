@@ -1,6 +1,5 @@
 package com.willian.fieldengineering.entity;
 
-import com.willian.fieldengineering.FieldEngineering;
 import com.willian.fieldengineering.registry.ModEntities;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -14,13 +13,13 @@ import net.minecraft.world.level.Level;
 public class MissileEntity extends ThrowableItemProjectile {
 
     private static final double ASCENT_SPEED = 1.8;
+    private static final double MAX_RENDER_DISTANCE = 1024.0;
 
     // 0,9 segundos.
     private static final int DESCENT_TICKS = 18;
 
     private boolean descending = false;
     private double ascentCeilingY = Double.POSITIVE_INFINITY;
-    private int lastRenderCheckDebugTick = -1;
 
     private double impactX;
     private double impactY;
@@ -78,10 +77,6 @@ public class MissileEntity extends ThrowableItemProjectile {
         this.ascentCeilingY = maxY;
     }
 
-    public boolean isDescending() {
-        return descending;
-    }
-
     public void configureDescending(
             double startX,
             double startY,
@@ -120,43 +115,11 @@ public class MissileEntity extends ThrowableItemProjectile {
 
     @Override
     public boolean shouldRenderAtSqrDistance(double distance) {
-        if (
-                level().isClientSide
-                        && tickCount % 10 == 0
-                        && lastRenderCheckDebugTick != tickCount
-        ) {
-            lastRenderCheckDebugTick = tickCount;
-
-            FieldEngineering.LOGGER.info(
-                    "[MISSILE RENDER CHECK] id={} tick={} distance={} pos=({}, {}, {})",
-                    getId(),
-                    tickCount,
-                    Math.sqrt(distance),
-                    getX(),
-                    getY(),
-                    getZ()
-            );
-        }
-
-        return true;
+        return distance <= MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
     }
 
     @Override
     public void tick() {
-        if (tickCount % 10 == 0) {
-            FieldEngineering.LOGGER.info(
-                    "[MISSILE {} TICK] id={} tick={} pos=({}, {}, {}) descending={} removed={}",
-                    level().isClientSide ? "CLIENT" : "SERVER",
-                    getId(),
-                    tickCount,
-                    getX(),
-                    getY(),
-                    getZ(),
-                    descending,
-                    isRemoved()
-            );
-        }
-
         if (level() instanceof ServerLevel) {
 
             if (descending) {

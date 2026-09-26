@@ -18,7 +18,7 @@ Update this file whenever a meaningful feature is completed, removed, or changes
 fix/issue-2-missile-long-range-visuals
 ```
 
-The branch was reset to `main` after the previous tracking/remote-visual experiments did not improve the real result. The current approach keeps the original simulation model but extends the visible flight envelope and uses a dedicated renderer for long-range readability.
+The branch was reset to `main` after the previous tracking/remote-visual experiments did not improve the real result. The current approach keeps the original simulation model, extends the visible flight envelope, and uses a dedicated renderer for long-range readability.
 
 ## Implemented
 
@@ -66,10 +66,22 @@ The branch was reset to `main` after the previous tracking/remote-visual experim
 - Custom client renderer replaces the plain `ThrownItemRenderer`.
 - Vanilla firework body is rendered at 2x visual scale for readability.
 - Renderer adds a layered 8-block velocity-aligned trail directly in the render pipeline.
-- The renderer preserves a vertical trail when the ascending missile is stationary at the world ceiling.
-- The direct trail does not use the vanilla particle system and therefore is not subject to particle render-distance limits.
-- Missile client tracking range is currently increased from 10 to 48 chunks as a focused test for early visual disappearance.
+- When missile velocity is near zero, the renderer uses an upward fallback direction so the ceiling trail remains visible without depending on unsynchronized client-side `descending` state.
+- `shouldRenderAtSqrDistance` explicitly permits missile rendering up to 1024 blocks.
+- Client tracking range is restored to the original 10 chunks; the 48-chunk diagnostic test did not change the disappearance point.
+- Temporary visibility debug logs were removed after diagnosis.
 - Explosion damages entities without terrain destruction.
+
+### Visibility diagnosis
+
+The focused diagnostic test separated tracking from rendering:
+
+- increasing `clientTrackingRange` from 10 to 48 chunks produced no visible improvement;
+- server and client tick logs showed the same missile entity continuing to exist after it had previously disappeared visually;
+- forcing `shouldRenderAtSqrDistance` to return `true` made the full ascent/ceiling/descent transition visible;
+- the disappearance was therefore caused by entity render-distance culling rather than despawn or loss of client tracking.
+
+The final candidate fix keeps the normal tracking range and replaces the unlimited debug override with a bounded 1024-block render distance.
 
 ### Timing
 
@@ -97,20 +109,21 @@ Current audio works, but future design may add entity-attached loops, distance l
 
 ## Previous issue #2 experiments
 
-Two approaches were tested and rejected before the current renderer-based implementation:
+Rejected/diagnostic approaches before the current candidate fix:
 
 1. increasing missile tracking/render range and moving the particle trail client-side;
-2. a remote deterministic missile-visual manager independent of physical entity tracking.
+2. a remote deterministic missile-visual manager independent of physical entity tracking;
+3. increasing `clientTrackingRange` from 10 to 48 chunks as an isolated tracking test.
 
-Real-world testing showed no useful improvement, and the second approach made the visual result worse. The clean launcher test then showed that the vanilla rocket entity itself remains visible at useful distance while the particle trail disappears much earlier. This redirected the fix toward direct rendering rather than networking/tracking changes.
+The first two approaches did not improve the real result enough. The isolated 48-chunk test also produced no change. Direct diagnostics then showed that the entity remained synchronized while normal render-distance culling stopped drawing it.
 
 ## Real-world test to perform
 
 1. confirm the close-range launch still looks and behaves like `main`;
 2. verify the vanilla rocket body is visibly larger but still recognizable;
-3. confirm the ascending missile stays visible beyond the old 40-tick despawn point;
-4. confirm it reaches the world ceiling and remains there until descent begins;
-5. verify whether the 48-chunk client tracking range prevents the missile from disappearing early;
+3. confirm the ascending missile stays visible through the complete climb to the world ceiling;
+4. confirm it remains visible at the ceiling until descent begins;
+5. verify the bounded 1024-block render-distance override preserves the successful debug behavior;
 6. observe the missile at increasing distance and verify the direct trail remains visible after vanilla particles disappear;
 7. test both air-target and ground-target timing;
 8. verify the descending missile starts at world ceiling and still impacts exactly after 18 ticks;
@@ -119,8 +132,7 @@ Real-world testing showed no useful improvement, and the second approach made th
 
 Watch specifically for:
 
-- ascending missile disappearing before descent begins;
-- whether disappearance distance changes materially with 48-chunk tracking;
+- missile disappearing again before descent begins;
 - unexpected overlap between ascending and descending missiles;
 - descending missile missing its locked impact point;
 - trail disappearing at the same distance as vanilla particles;
@@ -133,8 +145,8 @@ Watch specifically for:
 
 - Radar scans still use Minecraft entity AABB queries; this is expected to be much cheaper than block-volume scanning and is currently cached/shared.
 - Existing vanilla particles are intentionally retained as close-range detail for now.
-- The new direct trail still depends on the missile entity itself being rendered.
-- The 48-chunk tracking range is an active diagnostic/behavioral test and should be re-evaluated after real-world validation.
+- The direct trail still depends on the missile entity itself being rendered.
+- Missile render distance is intentionally bounded at 1024 blocks rather than unlimited.
 - Missile model replacement/refinement is deferred to a separate future PR.
 - PvE is the priority; multiplayer is not currently a design target.
 - Existing lock/descent timing is intentionally preserved even though the visible ascent now lasts longer.

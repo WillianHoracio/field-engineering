@@ -55,21 +55,9 @@ public class MissileRenderer extends ThrownItemRenderer<MissileEntity> {
             MultiBufferSource buffer
     ) {
         Vec3 movement = missile.getDeltaMovement();
-        Vec3 direction;
-
-        if (movement.lengthSqr() < 0.0001) {
-            if (missile.isDescending()) {
-                return;
-            }
-
-            direction = new Vec3(
-                    0.0,
-                    1.0,
-                    0.0
-            );
-        } else {
-            direction = movement.normalize();
-        }
+        Vec3 direction = movement.lengthSqr() < 0.0001
+                ? new Vec3(0.0, 1.0, 0.0)
+                : movement.normalize();
 
         Vec3 tail = direction.scale(-TRAIL_LENGTH);
 
