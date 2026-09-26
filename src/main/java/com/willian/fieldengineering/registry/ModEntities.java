@@ -22,7 +22,7 @@ public class ModEntities {
                                     0.25f,
                                     0.25f
                             )
-                            .clientTrackingRange(10)
+                            .clientTrackingRange(48)
                             .updateInterval(1)
                             .build(
                                     FieldEngineering.MOD_ID + ":missile"
