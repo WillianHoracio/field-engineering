@@ -1,7 +1,23 @@
 {
   "variants": {
-    "": {
-      "model": "minecraft:block/air"
-    }
+    "offset_x=-1,offset_y=0,offset_z=-1": {"model": "field-engineering:block/launcher_base_part"},
+    "offset_x=-1,offset_y=0,offset_z=0": {"model": "field-engineering:block/launcher_base_part"},
+    "offset_x=-1,offset_y=0,offset_z=1": {"model": "field-engineering:block/launcher_base_part"},
+    "offset_x=0,offset_y=0,offset_z=-1": {"model": "field-engineering:block/launcher_base_part"},
+    "offset_x=0,offset_y=0,offset_z=0": {"model": "field-engineering:block/launcher_base_part"},
+    "offset_x=0,offset_y=0,offset_z=1": {"model": "field-engineering:block/launcher_base_part"},
+    "offset_x=1,offset_y=0,offset_z=-1": {"model": "field-engineering:block/launcher_base_part"},
+    "offset_x=1,offset_y=0,offset_z=0": {"model": "field-engineering:block/launcher_base_part"},
+    "offset_x=1,offset_y=0,offset_z=1": {"model": "field-engineering:block/launcher_base_part"},
+
+    "offset_x=-1,offset_y=1,offset_z=-1": {"model": "field-engineering:block/launcher_tube"},
+    "offset_x=-1,offset_y=1,offset_z=0": {"model": "field-engineering:block/launcher_upper_bridge"},
+    "offset_x=-1,offset_y=1,offset_z=1": {"model": "field-engineering:block/launcher_tube"},
+    "offset_x=0,offset_y=1,offset_z=-1": {"model": "field-engineering:block/launcher_upper_bridge"},
+    "offset_x=0,offset_y=1,offset_z=0": {"model": "field-engineering:block/launcher_upper_core"},
+    "offset_x=0,offset_y=1,offset_z=1": {"model": "field-engineering:block/launcher_upper_bridge"},
+    "offset_x=1,offset_y=1,offset_z=-1": {"model": "field-engineering:block/launcher_tube"},
+    "offset_x=1,offset_y=1,offset_z=0": {"model": "field-engineering:block/launcher_upper_bridge"},
+    "offset_x=1,offset_y=1,offset_z=1": {"model": "field-engineering:block/launcher_tube"}
   }
 }

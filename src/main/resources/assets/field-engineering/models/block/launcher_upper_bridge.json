@@ -1,0 +1,28 @@
+{
+  "ambientocclusion": false,
+  "textures": {
+    "metal": "minecraft:block/iron_block",
+    "dark": "minecraft:block/polished_blackstone",
+    "particle": "minecraft:block/polished_blackstone"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 3, 16],
+      "faces": {
+        "north": {"texture": "#dark"}, "south": {"texture": "#dark"},
+        "east": {"texture": "#dark"}, "west": {"texture": "#dark"},
+        "up": {"texture": "#dark"}, "down": {"texture": "#dark"}
+      }
+    },
+    {
+      "from": [5, 3, 5],
+      "to": [11, 8, 11],
+      "faces": {
+        "north": {"texture": "#metal"}, "south": {"texture": "#metal"},
+        "east": {"texture": "#metal"}, "west": {"texture": "#metal"},
+        "up": {"texture": "#metal"}, "down": {"texture": "#metal"}
+      }
+    }
+  ]
+}

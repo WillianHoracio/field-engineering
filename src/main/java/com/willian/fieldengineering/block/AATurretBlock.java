@@ -62,10 +62,6 @@ public class AATurretBlock extends BaseEntityBlock {
         BlockPos masterPos =
                 context.getClickedPos();
 
-        /*
-         * Antes de colocar, verificamos os
-         * outros 17 espaços do multibloco.
-         */
         if (!hasEnoughSpace(
                 level,
                 masterPos
@@ -111,19 +107,6 @@ public class AATurretBlock extends BaseEntityBlock {
             Level level,
             BlockPos masterPos
     ) {
-        /*
-         * Estrutura:
-         *
-         * X = -1 até +1
-         * Z = -1 até +1
-         * Y = 0 até +1
-         *
-         * Total:
-         * 3 x 3 x 2 = 18 blocos.
-         *
-         * O centro inferior é o próprio master.
-         */
-
         for (int y = 0; y <= 1; y++) {
 
             for (int x = -1; x <= 1; x++) {
@@ -145,10 +128,6 @@ public class AATurretBlock extends BaseEntityBlock {
                                     z
                             );
 
-                    /*
-                     * Impede colocar parte da torre
-                     * fora da altura válida do mundo.
-                     */
                     if (
                             checkPos.getY()
                                     < level.getMinBuildHeight()
@@ -163,18 +142,6 @@ public class AATurretBlock extends BaseEntityBlock {
                         return false;
                     }
 
-                    /*
-                     * O espaço precisa ser substituível:
-                     *
-                     * ar;
-                     * grama;
-                     * neve fina;
-                     * plantas;
-                     * etc.
-                     *
-                     * Pedra, madeira e outros blocos
-                     * sólidos impedem a colocação.
-                     */
                     if (
                             !level.getBlockState(checkPos)
                                     .canBeReplaced()
@@ -213,10 +180,25 @@ public class AATurretBlock extends BaseEntityBlock {
                                     z
                             );
 
+                    BlockState partState =
+                            ModBlocks.LAUNCHER_PART
+                                    .defaultBlockState()
+                                    .setValue(
+                                            LauncherPartBlock.OFFSET_X,
+                                            x
+                                    )
+                                    .setValue(
+                                            LauncherPartBlock.OFFSET_Y,
+                                            y
+                                    )
+                                    .setValue(
+                                            LauncherPartBlock.OFFSET_Z,
+                                            z
+                                    );
+
                     level.setBlock(
                             partPos,
-                            ModBlocks.LAUNCHER_PART
-                                    .defaultBlockState(),
+                            partState,
                             Block.UPDATE_ALL
                     );
                 }
@@ -253,9 +235,6 @@ public class AATurretBlock extends BaseEntityBlock {
                             level.getBlockState(partPos)
                                     .is(ModBlocks.LAUNCHER_PART)
                     ) {
-                        /*
-                         * Remove sem dropar nada.
-                         */
                         level.setBlock(
                                 partPos,
                                 Blocks.AIR
@@ -276,13 +255,6 @@ public class AATurretBlock extends BaseEntityBlock {
             BlockState newState,
             boolean movedByPiston
     ) {
-        /*
-         * Só desmonta caso realmente tenha deixado
-         * de ser o bloco principal.
-         *
-         * Isso evita destruir a estrutura numa
-         * simples atualização de BlockState.
-         */
         if (
                 !state.is(
                         newState.getBlock()

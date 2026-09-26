@@ -1,0 +1,47 @@
+{
+  "ambientocclusion": false,
+  "textures": {
+    "metal": "minecraft:block/iron_block",
+    "dark": "minecraft:block/polished_blackstone",
+    "warning": "minecraft:block/yellow_concrete",
+    "particle": "minecraft:block/iron_block"
+  },
+  "elements": [
+    {
+      "from": [2, 0, 2],
+      "to": [14, 3, 14],
+      "faces": {
+        "north": {"texture": "#dark"}, "south": {"texture": "#dark"},
+        "east": {"texture": "#dark"}, "west": {"texture": "#dark"},
+        "up": {"texture": "#dark"}, "down": {"texture": "#dark"}
+      }
+    },
+    {
+      "from": [3, 3, 3],
+      "to": [13, 14, 13],
+      "faces": {
+        "north": {"texture": "#metal"}, "south": {"texture": "#metal"},
+        "east": {"texture": "#metal"}, "west": {"texture": "#metal"},
+        "up": {"texture": "#metal"}, "down": {"texture": "#metal"}
+      }
+    },
+    {
+      "from": [2, 14, 2],
+      "to": [14, 16, 14],
+      "faces": {
+        "north": {"texture": "#dark"}, "south": {"texture": "#dark"},
+        "east": {"texture": "#dark"}, "west": {"texture": "#dark"},
+        "up": {"texture": "#dark"}, "down": {"texture": "#dark"}
+      }
+    },
+    {
+      "from": [6, 12, 6],
+      "to": [10, 15, 10],
+      "faces": {
+        "north": {"texture": "#warning"}, "south": {"texture": "#warning"},
+        "east": {"texture": "#warning"}, "west": {"texture": "#warning"},
+        "up": {"texture": "#warning"}, "down": {"texture": "#warning"}
+      }
+    }
+  ]
+}

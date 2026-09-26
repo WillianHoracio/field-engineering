@@ -8,16 +8,35 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 
 public class LauncherPartBlock extends Block {
 
     public static final MapCodec<LauncherPartBlock> CODEC =
             simpleCodec(LauncherPartBlock::new);
 
+    public static final IntegerProperty OFFSET_X =
+            IntegerProperty.create("offset_x", -1, 1);
+
+    public static final IntegerProperty OFFSET_Y =
+            IntegerProperty.create("offset_y", 0, 1);
+
+    public static final IntegerProperty OFFSET_Z =
+            IntegerProperty.create("offset_z", -1, 1);
+
     public LauncherPartBlock(
             Properties properties
     ) {
         super(properties);
+
+        this.registerDefaultState(
+                this.stateDefinition
+                        .any()
+                        .setValue(OFFSET_X, 0)
+                        .setValue(OFFSET_Y, 0)
+                        .setValue(OFFSET_Z, 0)
+        );
     }
 
     @Override
@@ -26,17 +45,21 @@ public class LauncherPartBlock extends Block {
     }
 
     @Override
+    protected void createBlockStateDefinition(
+            StateDefinition.Builder<Block, BlockState> builder
+    ) {
+        builder.add(
+                OFFSET_X,
+                OFFSET_Y,
+                OFFSET_Z
+        );
+    }
+
+    @Override
     protected RenderShape getRenderShape(
             BlockState state
     ) {
-        /*
-         * Esse bloco existe apenas para reservar
-         * fisicamente o espaço da torre.
-         *
-         * O modelo visual inteiro é renderizado
-         * pelo bloco central.
-         */
-        return RenderShape.INVISIBLE;
+        return RenderShape.MODEL;
     }
 
     @Override
@@ -50,17 +73,11 @@ public class LauncherPartBlock extends Block {
             BlockPos masterPos =
                     findMasterBlock(
                             level,
-                            pos
+                            pos,
+                            state
                     );
 
             if (masterPos != null) {
-                /*
-                 * Quebrar qualquer parte quebra
-                 * o bloco principal.
-                 *
-                 * Se não estiver no criativo,
-                 * o bloco principal dropa o item.
-                 */
                 level.destroyBlock(
                         masterPos,
                         !player.isCreative(),
@@ -79,19 +96,26 @@ public class LauncherPartBlock extends Block {
 
     private BlockPos findMasterBlock(
             Level level,
-            BlockPos partPos
+            BlockPos partPos,
+            BlockState state
     ) {
-        /*
-         * O master sempre fica:
-         *
-         * - no centro do 3x3;
-         * - na camada inferior.
-         *
-         * Como não armazenamos BlockEntity
-         * nas partes auxiliares, procuramos
-         * o master nessa pequena região.
-         */
+        BlockPos expectedMasterPos =
+                partPos.offset(
+                        -state.getValue(OFFSET_X),
+                        -state.getValue(OFFSET_Y),
+                        -state.getValue(OFFSET_Z)
+                );
 
+        if (
+                level.getBlockState(expectedMasterPos)
+                        .is(ModBlocks.AA_TURRET)
+        ) {
+            return expectedMasterPos;
+        }
+
+        /*
+         * Fallback para estruturas antigas ou estados incompletos.
+         */
         for (int yOffset = -1; yOffset <= 0; yOffset++) {
 
             for (int xOffset = -1; xOffset <= 1; xOffset++) {
