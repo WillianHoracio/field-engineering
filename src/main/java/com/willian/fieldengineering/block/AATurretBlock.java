@@ -185,7 +185,7 @@ public class AATurretBlock extends BaseEntityBlock {
                                     .defaultBlockState()
                                     .setValue(
                                             LauncherPartBlock.OFFSET_X,
-                                            x
+                                            LauncherPartBlock.encodeHorizontalOffset(x)
                                     )
                                     .setValue(
                                             LauncherPartBlock.OFFSET_Y,
@@ -193,7 +193,7 @@ public class AATurretBlock extends BaseEntityBlock {
                                     )
                                     .setValue(
                                             LauncherPartBlock.OFFSET_Z,
-                                            z
+                                            LauncherPartBlock.encodeHorizontalOffset(z)
                                     );
 
                     level.setBlock(

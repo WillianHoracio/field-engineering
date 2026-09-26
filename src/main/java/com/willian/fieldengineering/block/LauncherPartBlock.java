@@ -16,14 +16,20 @@ public class LauncherPartBlock extends Block {
     public static final MapCodec<LauncherPartBlock> CODEC =
             simpleCodec(LauncherPartBlock::new);
 
+    /*
+     * IntegerProperty não aceita valores negativos.
+     *
+     * X/Z são armazenados como 0..2 e representam
+     * offsets reais -1..1 através de encode/decode.
+     */
     public static final IntegerProperty OFFSET_X =
-            IntegerProperty.create("offset_x", -1, 1);
+            IntegerProperty.create("offset_x", 0, 2);
 
     public static final IntegerProperty OFFSET_Y =
             IntegerProperty.create("offset_y", 0, 1);
 
     public static final IntegerProperty OFFSET_Z =
-            IntegerProperty.create("offset_z", -1, 1);
+            IntegerProperty.create("offset_z", 0, 2);
 
     public LauncherPartBlock(
             Properties properties
@@ -33,10 +39,18 @@ public class LauncherPartBlock extends Block {
         this.registerDefaultState(
                 this.stateDefinition
                         .any()
-                        .setValue(OFFSET_X, 0)
+                        .setValue(OFFSET_X, 1)
                         .setValue(OFFSET_Y, 0)
-                        .setValue(OFFSET_Z, 0)
+                        .setValue(OFFSET_Z, 1)
         );
+    }
+
+    public static int encodeHorizontalOffset(int offset) {
+        return offset + 1;
+    }
+
+    public static int decodeHorizontalOffset(int encodedOffset) {
+        return encodedOffset - 1;
     }
 
     @Override
@@ -99,11 +113,19 @@ public class LauncherPartBlock extends Block {
             BlockPos partPos,
             BlockState state
     ) {
+        int offsetX = decodeHorizontalOffset(
+                state.getValue(OFFSET_X)
+        );
+
+        int offsetZ = decodeHorizontalOffset(
+                state.getValue(OFFSET_Z)
+        );
+
         BlockPos expectedMasterPos =
                 partPos.offset(
-                        -state.getValue(OFFSET_X),
+                        -offsetX,
                         -state.getValue(OFFSET_Y),
-                        -state.getValue(OFFSET_Z)
+                        -offsetZ
                 );
 
         if (
