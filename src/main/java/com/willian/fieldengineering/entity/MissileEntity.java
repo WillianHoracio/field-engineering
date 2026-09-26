@@ -1,7 +1,6 @@
 package com.willian.fieldengineering.entity;
 
 import com.willian.fieldengineering.registry.ModEntities;
-import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
@@ -10,7 +9,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
-import org.joml.Vector3f;
 
 public class MissileEntity extends ThrowableItemProjectile {
 
@@ -18,11 +16,6 @@ public class MissileEntity extends ThrowableItemProjectile {
 
     // 0,9 segundos.
     private static final int DESCENT_TICKS = 18;
-
-    private static final DustParticleOptions GREEN_SMOKE = new DustParticleOptions(
-            new Vector3f(0.12f, 0.85f, 0.18f),
-            1.35f
-    );
 
     private boolean descending = false;
     private double ascentCeilingY = Double.POSITIVE_INFINITY;
@@ -287,7 +280,7 @@ public class MissileEntity extends ThrowableItemProjectile {
         );
 
         level.sendParticles(
-                GREEN_SMOKE,
+                ParticleTypes.SMOKE,
                 x,
                 y,
                 z,
