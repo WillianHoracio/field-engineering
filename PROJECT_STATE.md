@@ -11,14 +11,15 @@ Update this file whenever a meaningful feature is completed, removed, or changes
 - Production artifact: `build/libs/field-engineering-1.0.0.jar`.
 - The mod loads in the real launcher/modpack.
 - The performance foundation refactor has been merged to `main`.
+- Long-range missile visibility fix has been merged to `main`.
 
 ## Current branch under test
 
 ```text
-fix/issue-2-missile-long-range-visuals
+feat/sam-launcher-model-pass
 ```
 
-The branch was reset to `main` after the previous tracking/remote-visual experiments did not improve the real result. The current approach keeps the original simulation model, extends the visible flight envelope, and uses a dedicated renderer for long-range readability.
+This branch begins the visual-model pass for the launcher/radar/missile set. The first step replaces the oversized single-block launcher model with a valid multiblock-rendered static SAM battery that uses the existing 3x3x2 structure.
 
 ## Implemented
 
@@ -32,11 +33,18 @@ The branch was reset to `main` after the previous tracking/remote-visual experim
 - On-demand entity scanning instead of continuous autonomous scanning.
 - Scan results cached for 20 ticks so multiple launchers can reuse one scan.
 - Debug particles remain limited to one detected target per scan.
+- Radar visual redesign is planned later in this PR.
 
 ### Launcher
 
 - 3x3x2 multiblock footprint.
-- Central master block with invisible structural parts.
+- Central master block plus 17 structural part blocks.
+- Structural parts now store their X/Y/Z offset relative to the master.
+- Structural parts render dedicated local block models instead of remaining invisible.
+- The launcher visual is distributed across the existing 3x3x2 multiblock, avoiding the previous oversized single-block-model limitation.
+- Current static SAM concept uses a low armored base, central machinery, four vertical launch cells, bridge supports, and a compact control panel.
+- All rendered model geometry stays within normal per-block model bounds.
+- Breaking any structural part still destroys the master; offset data is used for direct master lookup with the old local scan retained as fallback.
 - Radar discovery through `RadarRegistry`; no block-volume brute-force search.
 - Radar range check is horizontal (X/Z) and uses squared distance.
 - Idle target acquisition occurs approximately every 5 seconds.
@@ -62,38 +70,24 @@ The branch was reset to `main` after the previous tracking/remote-visual experim
 - Descent still lasts exactly 18 ticks; velocity increases automatically to cover the larger distance.
 - Final impact is still snapped to the locked coordinate before explosion, preserving precision.
 - Original close-range firework/smoke/flame particles preserved.
-- Temporary green-smoke experiment was reverted; smoke is vanilla again.
 - Custom client renderer replaces the plain `ThrownItemRenderer`.
 - Vanilla firework body is rendered at 2x visual scale for readability.
 - Renderer adds a layered 8-block velocity-aligned trail directly in the render pipeline.
-- When missile velocity is near zero, the renderer uses an upward fallback direction so the ceiling trail remains visible without depending on unsynchronized client-side `descending` state.
+- When missile velocity is near zero, the renderer uses an upward fallback direction so the ceiling trail remains visible.
 - `shouldRenderAtSqrDistance` explicitly permits missile rendering up to 1024 blocks.
-- Client tracking range is restored to the original 10 chunks; the 48-chunk diagnostic test did not change the disappearance point.
-- Temporary visibility debug logs were removed after diagnosis.
+- Client tracking range remains at the original 10 chunks.
 - Explosion damages entities without terrain destruction.
-
-### Visibility diagnosis
-
-The focused diagnostic test separated tracking from rendering:
-
-- increasing `clientTrackingRange` from 10 to 48 chunks produced no visible improvement;
-- server and client tick logs showed the same missile entity continuing to exist after it had previously disappeared visually;
-- forcing `shouldRenderAtSqrDistance` to return `true` made the full ascent/ceiling/descent transition visible;
-- the disappearance was therefore caused by entity render-distance culling rather than despawn or loss of client tracking.
-
-The final candidate fix keeps the normal tracking range and replaces the unlimited debug override with a bounded 1024-block render distance.
+- Missile model redesign is planned after the launcher visual is approved.
 
 ### Timing
 
-The strike timing itself is unchanged from the validated baseline:
+The strike timing remains unchanged:
 
 ```text
 launch -> 180 ticks (9.0 s) -> target lock / air descent
                          +22 ticks (1.1 s) -> ground descent
                          +18 ticks (0.9 s) -> impact after descent begins
 ```
-
-The 180 ticks are the previous 40-tick ascent phase plus the 140-tick (7 second) post-ascent wait. The visual ascent now fills that previously empty interval instead of disappearing after 2 seconds.
 
 ### Audio
 
@@ -105,63 +99,37 @@ launch.ogg
 explosion.ogg
 ```
 
-Current audio works, but future design may add entity-attached loops, distance layers, directional behavior, and Doppler-like pitch changes.
+## Current real-world test
 
-## Previous issue #2 experiments
+Test the new static SAM launcher model in the real modpack:
 
-Rejected/diagnostic approaches before the current candidate fix:
-
-1. increasing missile tracking/render range and moving the particle trail client-side;
-2. a remote deterministic missile-visual manager independent of physical entity tracking;
-3. increasing `clientTrackingRange` from 10 to 48 chunks as an isolated tracking test.
-
-The first two approaches did not improve the real result enough. The isolated 48-chunk test also produced no change. Direct diagnostics then showed that the entity remained synchronized while normal render-distance culling stopped drawing it.
-
-## Real-world test to perform
-
-1. confirm the close-range launch still looks and behaves like `main`;
-2. verify the vanilla rocket body is visibly larger but still recognizable;
-3. confirm the ascending missile stays visible through the complete climb to the world ceiling;
-4. confirm it remains visible at the ceiling until descent begins;
-5. verify the bounded 1024-block render-distance override preserves the successful debug behavior;
-6. observe the missile at increasing distance and verify the direct trail remains visible after vanilla particles disappear;
-7. test both air-target and ground-target timing;
-8. verify the descending missile starts at world ceiling and still impacts exactly after 18 ticks;
-9. verify impact point, damage, audio, and target reservation behavior are unchanged;
-10. fire several missiles and check client FPS/server responsiveness.
-
-Watch specifically for:
-
-- missile disappearing again before descent begins;
-- unexpected overlap between ascending and descending missiles;
-- descending missile missing its locked impact point;
-- trail disappearing at the same distance as vanilla particles;
-- trail not aligning with missile movement;
-- line width behaving differently with Sodium/Iris/shaders;
-- excessive visual thickness close to the camera;
-- altered missile behavior unrelated to rendering.
+1. verify the launcher still places as a 3x3x2 multiblock;
+2. confirm all 17 auxiliary blocks render the intended pieces rather than air;
+3. verify four vertical launch cells appear in the upper corners;
+4. check that there are no floating/disconnected components;
+5. confirm no model-too-large warning appears;
+6. rotate/place the launcher in different directions and verify the central control panel orientation still follows the master facing;
+7. break several different structural parts and confirm the whole launcher still dismantles correctly;
+8. fire missiles and verify the visual change does not alter targeting, timing, launch effects, or cleanup;
+9. check Sodium/Iris/shader compatibility and obvious z-fighting/seams.
 
 ## Known/intentional constraints
 
-- Radar scans still use Minecraft entity AABB queries; this is expected to be much cheaper than block-volume scanning and is currently cached/shared.
-- Existing vanilla particles are intentionally retained as close-range detail for now.
-- The direct trail still depends on the missile entity itself being rendered.
+- The first launcher pass uses vanilla Minecraft textures as placeholders so geometry can be validated before custom texture work.
+- The new launcher is a fixed SAM installation rather than a parked truck/mobile launcher.
+- The launcher remains exactly 3x3x2 for gameplay/placement even though future decorative refinements may change perceived proportions.
+- Radar and missile model redesigns are still pending in this PR.
+- Radar scans still use Minecraft entity AABB queries and shared caching.
 - Missile render distance is intentionally bounded at 1024 blocks rather than unlimited.
-- Missile model replacement/refinement is deferred to a separate future PR.
 - PvE is the priority; multiplayer is not currently a design target.
-- Existing lock/descent timing is intentionally preserved even though the visible ascent now lasts longer.
 - World-generation changes should avoid visible seams in already-generated large worlds.
 - Integrations should avoid hard dependencies on another mod's internals when a robust generic rule is sufficient.
 - The user owns gameplay/system design decisions. Code should implement those decisions rather than silently redefining them.
 
-## Next gameplay work after approval
+## Next steps in this PR
 
-Potential sequence:
-
-1. ammunition and ownership/player kill attribution;
-2. interceptors;
-3. hostile Illager batteries;
-4. tactical Illager AI;
-5. siege/game-mode systems and military points of interest.
-
-This list can change according to user design decisions.
+1. validate and refine the static SAM launcher ingame;
+2. redesign the radar in the same visual language;
+3. replace/refine the missile model at a scale appropriate to its TNT-like damage;
+4. add dedicated textures after geometry is approved;
+5. perform final visual/compatibility pass before merge.
