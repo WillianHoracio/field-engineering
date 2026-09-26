@@ -62,11 +62,13 @@ The branch was reset to `main` after the previous tracking/remote-visual experim
 - Descent still lasts exactly 18 ticks; velocity increases automatically to cover the larger distance.
 - Final impact is still snapped to the locked coordinate before explosion, preserving precision.
 - Original close-range firework/smoke/flame particles preserved.
+- Temporary green-smoke experiment was reverted; smoke is vanilla again.
 - Custom client renderer replaces the plain `ThrownItemRenderer`.
 - Vanilla firework body is rendered at 2x visual scale for readability.
 - Renderer adds a layered 8-block velocity-aligned trail directly in the render pipeline.
 - The renderer preserves a vertical trail when the ascending missile is stationary at the world ceiling.
 - The direct trail does not use the vanilla particle system and therefore is not subject to particle render-distance limits.
+- Missile client tracking range is currently increased from 10 to 48 chunks as a focused test for early visual disappearance.
 - Explosion damages entities without terrain destruction.
 
 ### Timing
@@ -108,15 +110,17 @@ Real-world testing showed no useful improvement, and the second approach made th
 2. verify the vanilla rocket body is visibly larger but still recognizable;
 3. confirm the ascending missile stays visible beyond the old 40-tick despawn point;
 4. confirm it reaches the world ceiling and remains there until descent begins;
-5. observe the missile at increasing distance and verify the direct trail remains visible after vanilla particles disappear;
-6. test both air-target and ground-target timing;
-7. verify the descending missile starts at world ceiling and still impacts exactly after 18 ticks;
-8. verify impact point, damage, audio, and target reservation behavior are unchanged;
-9. fire several missiles and check client FPS/server responsiveness.
+5. verify whether the 48-chunk client tracking range prevents the missile from disappearing early;
+6. observe the missile at increasing distance and verify the direct trail remains visible after vanilla particles disappear;
+7. test both air-target and ground-target timing;
+8. verify the descending missile starts at world ceiling and still impacts exactly after 18 ticks;
+9. verify impact point, damage, audio, and target reservation behavior are unchanged;
+10. fire several missiles and check client FPS/server responsiveness.
 
 Watch specifically for:
 
 - ascending missile disappearing before descent begins;
+- whether disappearance distance changes materially with 48-chunk tracking;
 - unexpected overlap between ascending and descending missiles;
 - descending missile missing its locked impact point;
 - trail disappearing at the same distance as vanilla particles;
@@ -129,7 +133,8 @@ Watch specifically for:
 
 - Radar scans still use Minecraft entity AABB queries; this is expected to be much cheaper than block-volume scanning and is currently cached/shared.
 - Existing vanilla particles are intentionally retained as close-range detail for now.
-- The new direct trail still depends on the missile entity itself being rendered; current testing indicates the entity remains visible farther than the particles.
+- The new direct trail still depends on the missile entity itself being rendered.
+- The 48-chunk tracking range is an active diagnostic/behavioral test and should be re-evaluated after real-world validation.
 - Missile model replacement/refinement is deferred to a separate future PR.
 - PvE is the priority; multiplayer is not currently a design target.
 - Existing lock/descent timing is intentionally preserved even though the visible ascent now lasts longer.
