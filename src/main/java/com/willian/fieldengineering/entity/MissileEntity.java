@@ -1,5 +1,6 @@
 package com.willian.fieldengineering.entity;
 
+import com.willian.fieldengineering.FieldEngineering;
 import com.willian.fieldengineering.registry.ModEntities;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -19,6 +20,7 @@ public class MissileEntity extends ThrowableItemProjectile {
 
     private boolean descending = false;
     private double ascentCeilingY = Double.POSITIVE_INFINITY;
+    private int lastRenderCheckDebugTick = -1;
 
     private double impactX;
     private double impactY;
@@ -117,7 +119,44 @@ public class MissileEntity extends ThrowableItemProjectile {
     }
 
     @Override
+    public boolean shouldRenderAtSqrDistance(double distance) {
+        if (
+                level().isClientSide
+                        && tickCount % 10 == 0
+                        && lastRenderCheckDebugTick != tickCount
+        ) {
+            lastRenderCheckDebugTick = tickCount;
+
+            FieldEngineering.LOGGER.info(
+                    "[MISSILE RENDER CHECK] id={} tick={} distance={} pos=({}, {}, {})",
+                    getId(),
+                    tickCount,
+                    Math.sqrt(distance),
+                    getX(),
+                    getY(),
+                    getZ()
+            );
+        }
+
+        return true;
+    }
+
+    @Override
     public void tick() {
+        if (tickCount % 10 == 0) {
+            FieldEngineering.LOGGER.info(
+                    "[MISSILE {} TICK] id={} tick={} pos=({}, {}, {}) descending={} removed={}",
+                    level().isClientSide ? "CLIENT" : "SERVER",
+                    getId(),
+                    tickCount,
+                    getX(),
+                    getY(),
+                    getZ(),
+                    descending,
+                    isRemoved()
+            );
+        }
+
         if (level() instanceof ServerLevel) {
 
             if (descending) {
