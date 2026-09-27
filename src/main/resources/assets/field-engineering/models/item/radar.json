@@ -1,3 +1,72 @@
 {
-  "parent": "field-engineering:block/radar"
+  "parent": "minecraft:block/block",
+  "textures": {
+    "all": "field-engineering:block/radar",
+    "particle": "field-engineering:block/radar"
+  },
+  "elements": [
+    {
+      "from": [2, 0, 2], "to": [14, 3, 14],
+      "faces": {
+        "north": {"texture": "#all"}, "south": {"texture": "#all"},
+        "east": {"texture": "#all"}, "west": {"texture": "#all"},
+        "up": {"texture": "#all"}, "down": {"texture": "#all"}
+      }
+    },
+    {
+      "from": [4, 3, 4], "to": [12, 5, 12],
+      "faces": {
+        "north": {"texture": "#all"}, "south": {"texture": "#all"},
+        "east": {"texture": "#all"}, "west": {"texture": "#all"},
+        "up": {"texture": "#all"}, "down": {"texture": "#all"}
+      }
+    },
+    {
+      "from": [6, 5, 6], "to": [10, 11, 10],
+      "faces": {
+        "north": {"texture": "#all"}, "south": {"texture": "#all"},
+        "east": {"texture": "#all"}, "west": {"texture": "#all"},
+        "up": {"texture": "#all"}, "down": {"texture": "#all"}
+      }
+    },
+    {
+      "from": [5, 10, 5], "to": [11, 12, 11],
+      "faces": {
+        "north": {"texture": "#all"}, "south": {"texture": "#all"},
+        "east": {"texture": "#all"}, "west": {"texture": "#all"},
+        "up": {"texture": "#all"}, "down": {"texture": "#all"}
+      }
+    },
+    {
+      "from": [2, 12, 7], "to": [14, 14, 9],
+      "faces": {
+        "north": {"texture": "#all"}, "south": {"texture": "#all"},
+        "east": {"texture": "#all"}, "west": {"texture": "#all"},
+        "up": {"texture": "#all"}, "down": {"texture": "#all"}
+      }
+    },
+    {
+      "from": [2.5, 9, 7.25], "to": [4, 12, 8.75],
+      "faces": {
+        "north": {"texture": "#all"}, "south": {"texture": "#all"},
+        "east": {"texture": "#all"}, "west": {"texture": "#all"},
+        "up": {"texture": "#all"}, "down": {"texture": "#all"}
+      }
+    },
+    {
+      "from": [12, 9, 7.25], "to": [13.5, 12, 8.75],
+      "faces": {
+        "north": {"texture": "#all"}, "south": {"texture": "#all"},
+        "east": {"texture": "#all"}, "west": {"texture": "#all"},
+        "up": {"texture": "#all"}, "down": {"texture": "#all"}
+      }
+    }
+  ],
+  "display": {
+    "gui": {"rotation": [30, 45, 0], "translation": [0, 0, 0], "scale": [0.75, 0.75, 0.75]},
+    "ground": {"rotation": [0, 0, 0], "translation": [0, 2, 0], "scale": [0.5, 0.5, 0.5]},
+    "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.75, 0.75, 0.75]},
+    "firstperson_righthand": {"rotation": [0, 45, 0], "translation": [0, 1, 0], "scale": [0.55, 0.55, 0.55]},
+    "thirdperson_righthand": {"rotation": [0, 45, 0], "translation": [0, 1, 0], "scale": [0.5, 0.5, 0.5]}
+  }
 }
