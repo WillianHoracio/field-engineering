@@ -19,37 +19,53 @@ import net.minecraft.resources.ResourceLocation;
 
 public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
 
-    private static final ResourceLocation TEXTURE =
-            ResourceLocation.withDefaultNamespace("textures/block/iron_block.png");
+    private static final ResourceLocation ARRAY_TEXTURE =
+            ResourceLocation.withDefaultNamespace("textures/block/green_terracotta.png");
 
-    private static final float ROTATION_SPEED = 0.045f;
+    private static final ResourceLocation MECHANISM_TEXTURE =
+            ResourceLocation.withDefaultNamespace("textures/block/polished_deepslate.png");
 
-    private final ModelPart antenna;
+    private static final float ROTATION_SPEED = 0.032f;
+
+    private final ModelPart array;
+    private final ModelPart mechanism;
 
     public RadarRenderer(BlockEntityRendererProvider.Context context) {
         MeshDefinition mesh = new MeshDefinition();
         PartDefinition root = mesh.getRoot();
 
         root.addOrReplaceChild(
-                "antenna",
+                "mechanism",
                 CubeListBuilder.create()
                         .texOffs(0, 0)
                         .addBox(-1.0f, -4.0f, -1.0f, 2.0f, 4.0f, 2.0f)
                         .texOffs(0, 0)
-                        .addBox(-6.0f, -1.0f, -0.75f, 12.0f, 2.0f, 1.5f)
+                        .addBox(-2.0f, -5.0f, -2.0f, 4.0f, 2.0f, 4.0f)
                         .texOffs(0, 0)
-                        .addBox(-5.5f, -4.0f, -0.5f, 1.5f, 3.0f, 1.0f)
+                        .addBox(-1.0f, -7.0f, 0.5f, 2.0f, 3.0f, 2.0f)
                         .texOffs(0, 0)
-                        .addBox(4.0f, -4.0f, -0.5f, 1.5f, 3.0f, 1.0f)
-                        .texOffs(0, 0)
-                        .addBox(-2.0f, -2.25f, -1.0f, 4.0f, 1.5f, 2.0f),
+                        .addBox(-5.0f, -2.0f, -0.75f, 10.0f, 1.0f, 1.5f),
                 PartPose.ZERO
         );
 
-        this.antenna = LayerDefinition
+        root.addOrReplaceChild(
+                "array",
+                CubeListBuilder.create()
+                        .texOffs(0, 0)
+                        .addBox(-7.0f, -12.0f, -1.0f, 14.0f, 7.0f, 2.0f)
+                        .texOffs(0, 0)
+                        .addBox(-6.0f, -13.5f, -0.75f, 12.0f, 1.0f, 1.5f)
+                        .texOffs(0, 0)
+                        .addBox(-3.0f, -5.0f, -1.25f, 6.0f, 1.0f, 2.5f),
+                PartPose.ZERO
+        );
+
+        ModelPart rootPart = LayerDefinition
                 .create(mesh, 16, 16)
-                .bakeRoot()
-                .getChild("antenna");
+                .bakeRoot();
+
+        this.array = rootPart.getChild("array");
+        this.mechanism = rootPart.getChild("mechanism");
     }
 
     @Override
@@ -71,16 +87,27 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
         ) * ROTATION_SPEED;
 
         poseStack.pushPose();
-        poseStack.translate(0.5, 0.96, 0.5);
+        poseStack.translate(0.5, 0.70, 0.5);
         poseStack.mulPose(Axis.YP.rotation(rotation));
 
-        VertexConsumer consumer = buffer.getBuffer(
-                RenderType.entityCutoutNoCull(TEXTURE)
+        VertexConsumer mechanismConsumer = buffer.getBuffer(
+                RenderType.entityCutoutNoCull(MECHANISM_TEXTURE)
         );
 
-        antenna.render(
+        mechanism.render(
                 poseStack,
-                consumer,
+                mechanismConsumer,
+                packedLight,
+                OverlayTexture.NO_OVERLAY
+        );
+
+        VertexConsumer arrayConsumer = buffer.getBuffer(
+                RenderType.entityCutoutNoCull(ARRAY_TEXTURE)
+        );
+
+        array.render(
+                poseStack,
+                arrayConsumer,
                 packedLight,
                 OverlayTexture.NO_OVERLAY
         );
