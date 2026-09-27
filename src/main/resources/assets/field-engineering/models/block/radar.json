@@ -1,10 +1,10 @@
 {
   "parent": "minecraft:block/block",
   "textures": {
-    "olive": "minecraft:block/green_terracotta",
     "dark": "minecraft:block/polished_deepslate",
     "metal": "minecraft:block/iron_block",
-    "particle": "minecraft:block/green_terracotta"
+    "copper": "minecraft:block/weathered_copper",
+    "particle": "minecraft:block/iron_block"
   },
   "elements": [
     {
@@ -18,17 +18,17 @@
     {
       "from": [2, 2, 2], "to": [14, 5, 14],
       "faces": {
-        "north": {"texture": "#olive"}, "south": {"texture": "#olive"},
-        "east": {"texture": "#olive"}, "west": {"texture": "#olive"},
-        "up": {"texture": "#olive"}, "down": {"texture": "#olive"}
+        "north": {"texture": "#metal"}, "south": {"texture": "#metal"},
+        "east": {"texture": "#metal"}, "west": {"texture": "#metal"},
+        "up": {"texture": "#metal"}, "down": {"texture": "#metal"}
       }
     },
     {
       "from": [4, 5, 4], "to": [12, 8, 12],
       "faces": {
-        "north": {"texture": "#dark"}, "south": {"texture": "#dark"},
-        "east": {"texture": "#dark"}, "west": {"texture": "#dark"},
-        "up": {"texture": "#dark"}, "down": {"texture": "#dark"}
+        "north": {"texture": "#copper"}, "south": {"texture": "#copper"},
+        "east": {"texture": "#copper"}, "west": {"texture": "#copper"},
+        "up": {"texture": "#copper"}, "down": {"texture": "#copper"}
       }
     },
     {
