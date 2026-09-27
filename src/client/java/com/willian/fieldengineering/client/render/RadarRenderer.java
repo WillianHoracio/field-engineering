@@ -19,16 +19,20 @@ import net.minecraft.resources.ResourceLocation;
 
 public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
 
-    private static final ResourceLocation ARRAY_TEXTURE =
-            ResourceLocation.withDefaultNamespace("textures/block/oxidized_copper.png");
-
-    private static final ResourceLocation MECHANISM_TEXTURE =
+    private static final ResourceLocation DISH_TEXTURE =
             ResourceLocation.withDefaultNamespace("textures/block/iron_block.png");
 
-    private static final float ROTATION_SPEED = 0.032f;
+    private static final ResourceLocation FRAME_TEXTURE =
+            ResourceLocation.withDefaultNamespace("textures/block/polished_deepslate.png");
 
-    private final ModelPart array;
+    private static final ResourceLocation DETAIL_TEXTURE =
+            ResourceLocation.withDefaultNamespace("textures/block/weathered_copper.png");
+
+    private static final float ROTATION_SPEED = 0.025f;
+
     private final ModelPart mechanism;
+    private final ModelPart dish;
+    private final ModelPart details;
 
     public RadarRenderer(BlockEntityRendererProvider.Context context) {
         MeshDefinition mesh = new MeshDefinition();
@@ -38,34 +42,69 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
                 "mechanism",
                 CubeListBuilder.create()
                         .texOffs(0, 0)
-                        .addBox(-1.0f, -4.0f, -1.0f, 2.0f, 4.0f, 2.0f)
+                        .addBox(-1.5f, -5.0f, -1.5f, 3.0f, 5.0f, 3.0f)
                         .texOffs(0, 0)
-                        .addBox(-2.0f, -5.0f, -2.0f, 4.0f, 2.0f, 4.0f)
+                        .addBox(-3.0f, -7.0f, -3.0f, 6.0f, 2.0f, 6.0f)
                         .texOffs(0, 0)
-                        .addBox(-1.0f, -7.0f, 0.5f, 2.0f, 3.0f, 2.0f)
+                        .addBox(-5.0f, -11.0f, -1.0f, 2.0f, 4.0f, 2.0f)
                         .texOffs(0, 0)
-                        .addBox(-5.0f, -2.0f, -0.75f, 10.0f, 1.0f, 1.5f),
+                        .addBox(3.0f, -11.0f, -1.0f, 2.0f, 4.0f, 2.0f)
+                        .texOffs(0, 0)
+                        .addBox(-5.0f, -12.0f, -1.25f, 10.0f, 2.0f, 2.5f)
+                        .texOffs(0, 0)
+                        .addBox(-1.0f, -14.0f, -1.0f, 2.0f, 2.0f, 2.0f),
                 PartPose.ZERO
         );
 
-        root.addOrReplaceChild(
-                "array",
+        PartDefinition dishRoot = root.addOrReplaceChild(
+                "dish",
+                CubeListBuilder.create(),
+                PartPose.offset(0.0f, -14.0f, 0.0f)
+        );
+
+        dishRoot.addOrReplaceChild(
+                "center",
                 CubeListBuilder.create()
                         .texOffs(0, 0)
-                        .addBox(-8.0f, -13.0f, -1.0f, 16.0f, 8.0f, 2.0f)
+                        .addBox(-6.0f, -4.0f, -0.75f, 12.0f, 8.0f, 1.5f),
+                PartPose.ZERO
+        );
+
+        dishRoot.addOrReplaceChild(
+                "left_wing",
+                CubeListBuilder.create()
                         .texOffs(0, 0)
-                        .addBox(-7.0f, -14.0f, -0.75f, 14.0f, 1.0f, 1.5f)
+                        .addBox(-4.0f, -4.0f, -0.75f, 4.0f, 8.0f, 1.5f),
+                PartPose.offsetAndRotation(-6.0f, 0.0f, 0.0f, 0.0f, -0.35f, 0.0f)
+        );
+
+        dishRoot.addOrReplaceChild(
+                "right_wing",
+                CubeListBuilder.create()
                         .texOffs(0, 0)
-                        .addBox(-3.5f, -5.0f, -1.25f, 7.0f, 1.0f, 2.5f),
+                        .addBox(0.0f, -4.0f, -0.75f, 4.0f, 8.0f, 1.5f),
+                PartPose.offsetAndRotation(6.0f, 0.0f, 0.0f, 0.0f, 0.35f, 0.0f)
+        );
+
+        root.addOrReplaceChild(
+                "details",
+                CubeListBuilder.create()
+                        .texOffs(0, 0)
+                        .addBox(-2.0f, -13.5f, -3.0f, 4.0f, 3.0f, 3.0f)
+                        .texOffs(0, 0)
+                        .addBox(-0.75f, -17.0f, -2.0f, 1.5f, 3.0f, 2.0f)
+                        .texOffs(0, 0)
+                        .addBox(6.0f, -15.5f, -1.5f, 2.0f, 2.0f, 2.0f),
                 PartPose.ZERO
         );
 
         ModelPart rootPart = LayerDefinition
-                .create(mesh, 16, 16)
+                .create(mesh, 32, 32)
                 .bakeRoot();
 
-        this.array = rootPart.getChild("array");
         this.mechanism = rootPart.getChild("mechanism");
+        this.dish = rootPart.getChild("dish");
+        this.details = rootPart.getChild("details");
     }
 
     @Override
@@ -88,29 +127,40 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
 
         poseStack.pushPose();
 
-        // The static block occupies the lower block. The rotating assembly is anchored
-        // in the block above, giving the radar an intentional two-block-tall silhouette.
-        poseStack.translate(0.5, 1.80, 0.5);
+        // The pedestal ends at 12/16 of the lower block. The rotating mast starts
+        // exactly there, so the antenna is visibly attached instead of floating.
+        poseStack.translate(0.5, 0.75, 0.5);
         poseStack.mulPose(Axis.YP.rotation(rotation));
 
-        VertexConsumer mechanismConsumer = buffer.getBuffer(
-                RenderType.entityCutoutNoCull(MECHANISM_TEXTURE)
+        VertexConsumer frameConsumer = buffer.getBuffer(
+                RenderType.entityCutoutNoCull(FRAME_TEXTURE)
         );
 
         mechanism.render(
                 poseStack,
-                mechanismConsumer,
+                frameConsumer,
                 packedLight,
                 OverlayTexture.NO_OVERLAY
         );
 
-        VertexConsumer arrayConsumer = buffer.getBuffer(
-                RenderType.entityCutoutNoCull(ARRAY_TEXTURE)
+        VertexConsumer dishConsumer = buffer.getBuffer(
+                RenderType.entityCutoutNoCull(DISH_TEXTURE)
         );
 
-        array.render(
+        dish.render(
                 poseStack,
-                arrayConsumer,
+                dishConsumer,
+                packedLight,
+                OverlayTexture.NO_OVERLAY
+        );
+
+        VertexConsumer detailConsumer = buffer.getBuffer(
+                RenderType.entityCutoutNoCull(DETAIL_TEXTURE)
+        );
+
+        details.render(
+                poseStack,
+                detailConsumer,
                 packedLight,
                 OverlayTexture.NO_OVERLAY
         );
