@@ -56,14 +56,14 @@ tracking/RadarRegistry.java
 tracking/TargetReservationRegistry.java
 ```
 
-Physical structure:
+Physical structure on the model-pass branch:
 
 - one master block at the center of the lower layer;
 - 3x3 footprint;
-- two blocks high;
-- 17 auxiliary structural blocks reserve the remaining volume;
+- three blocks high;
+- 26 auxiliary structural blocks reserve the remaining volume;
 - every auxiliary part stores `offset_x`, `offset_y`, and `offset_z` relative to the master;
-- auxiliary parts can render their own local model slice, allowing one visual installation to span the whole 3x3x2 structure without oversized single-block geometry;
+- auxiliary parts render local model slices so the full launcher stays within valid per-block model bounds;
 - breaking an auxiliary part destroys the master;
 - the master removes the auxiliary parts when removed.
 
@@ -71,16 +71,19 @@ The master owns launcher state. Structural parts contain only placement/visual i
 
 #### Multiblock visual model
 
-The static SAM launcher model is intentionally distributed across the already-reserved multiblock volume:
+The static SAM launcher model is distributed across the 3x3x3 structure:
 
 ```text
-lower layer: platform/base pieces + master machinery
-upper layer corners: four vertical launch cells
-upper layer edges: structural bridge pieces
-upper layer center: central upper machinery/cap
+lower layer: heavy fixed platform/base + master machinery
+middle layer corners: lower halves of four grouped vertical canisters
+middle layer edges/center: compact support and electronics pieces
+upper layer corners: upper halves/caps of the four canisters
+upper layer edges/center: visually empty reserved structure
 ```
 
-Each block model remains inside normal local model bounds. This avoids Blockbench/Minecraft `model too large` problems while preserving the intended full 3x3 installation scale.
+The four canisters are intentionally pulled toward the middle of the installation so the silhouette reads as a fixed SAM battery rather than four unrelated corner towers.
+
+Each block model remains inside normal local model bounds. This avoids Blockbench/Minecraft `model too large` problems while preserving the intended full installation scale.
 
 Current launcher geometry uses vanilla textures as placeholders during shape validation. Dedicated textures should be added only after the geometry is approved ingame.
 
@@ -141,6 +144,7 @@ Primary files:
 ```text
 entity/MissileEntity.java
 client/render/MissileRenderer.java
+models/item/aa_missile.json
 ```
 
 Responsibilities:
@@ -148,7 +152,8 @@ Responsibilities:
 - preserve the server-authoritative ascending and descending missile entity;
 - allow ascent to continue to the world ceiling instead of self-despawning after two seconds;
 - keep the approved firework/smoke/flame particles for close-range detail;
-- render the vanilla firework body at a larger client-side scale for readability;
+- render the mod's dedicated `aa_missile` 3D item model instead of a vanilla firework rocket;
+- use a compact interceptor-style body, nose and tail fins at a scale consistent with the current TNT-like damage;
 - render a direct client-side layered trail from missile velocity, independent of the vanilla particle-distance limit;
 - preserve a vertical trail while a missile is stationary at the world ceiling without relying on unsynchronized server-only state;
 - explicitly allow missile rendering up to 1024 blocks through `shouldRenderAtSqrDistance`;
