@@ -127,11 +127,10 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
 
         poseStack.pushPose();
 
-        // Minecraft model-part Y grows downward. Flip the local Y axis so the radar
-        // geometry defined with positive Y rises from the pedestal instead.
+        // The fixed pedestal ends at 12/16 of the lower block. The rotating assembly
+        // starts there and extends upward into the second block.
         poseStack.translate(0.5, 0.75, 0.5);
         poseStack.mulPose(Axis.YP.rotation(rotation));
-        poseStack.scale(1.0f, -1.0f, 1.0f);
 
         VertexConsumer frameConsumer = buffer.getBuffer(
                 RenderType.entityCutoutNoCull(FRAME_TEXTURE)
