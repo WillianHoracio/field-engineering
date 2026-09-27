@@ -42,24 +42,24 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
                 "mechanism",
                 CubeListBuilder.create()
                         .texOffs(0, 0)
-                        .addBox(-1.5f, 0.0f, -1.5f, 3.0f, 5.0f, 3.0f)
+                        .addBox(-1.5f, 0.0f, -1.5f, 3.0f, 6.0f, 3.0f)
                         .texOffs(0, 0)
-                        .addBox(-3.0f, 5.0f, -3.0f, 6.0f, 2.0f, 6.0f)
+                        .addBox(-3.5f, 6.0f, -3.5f, 7.0f, 2.0f, 7.0f)
                         .texOffs(0, 0)
-                        .addBox(-5.0f, 7.0f, -1.0f, 2.0f, 4.0f, 2.0f)
+                        .addBox(-5.5f, 8.0f, -1.0f, 2.0f, 6.0f, 2.0f)
                         .texOffs(0, 0)
-                        .addBox(3.0f, 7.0f, -1.0f, 2.0f, 4.0f, 2.0f)
+                        .addBox(3.5f, 8.0f, -1.0f, 2.0f, 6.0f, 2.0f)
                         .texOffs(0, 0)
-                        .addBox(-5.0f, 10.0f, -1.25f, 10.0f, 2.0f, 2.5f)
+                        .addBox(-5.5f, 13.0f, -1.25f, 11.0f, 2.0f, 2.5f)
                         .texOffs(0, 0)
-                        .addBox(-1.0f, 12.0f, -1.0f, 2.0f, 2.0f, 2.0f),
+                        .addBox(-1.0f, 15.0f, -1.0f, 2.0f, 2.0f, 2.0f),
                 PartPose.ZERO
         );
 
         PartDefinition dishRoot = root.addOrReplaceChild(
                 "dish",
                 CubeListBuilder.create(),
-                PartPose.offset(0.0f, 14.0f, 0.0f)
+                PartPose.offset(0.0f, 18.0f, 0.0f)
         );
 
         dishRoot.addOrReplaceChild(
@@ -90,11 +90,11 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
                 "details",
                 CubeListBuilder.create()
                         .texOffs(0, 0)
-                        .addBox(-2.0f, 10.5f, -3.0f, 4.0f, 3.0f, 3.0f)
+                        .addBox(-2.0f, 13.5f, -3.0f, 4.0f, 3.0f, 3.0f)
                         .texOffs(0, 0)
-                        .addBox(-0.75f, 14.0f, -2.0f, 1.5f, 3.0f, 2.0f)
+                        .addBox(-0.75f, 17.0f, -2.0f, 1.5f, 3.0f, 2.0f)
                         .texOffs(0, 0)
-                        .addBox(6.0f, 12.5f, -1.5f, 2.0f, 2.0f, 2.0f),
+                        .addBox(6.0f, 16.0f, -1.5f, 2.0f, 2.0f, 2.0f),
                 PartPose.ZERO
         );
 
@@ -127,9 +127,10 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
 
         poseStack.pushPose();
 
-        // The fixed pedestal ends at 12/16 of the lower block. The rotating assembly
-        // starts there and extends upward into the second block.
-        poseStack.translate(0.5, 0.75, 0.5);
+        // Keep the complete rotating head in the block above the fixed pedestal.
+        // The previous versions started the ModelPart at the pedestal top and made
+        // the rotation look embedded in the base. This origin is one full block up.
+        poseStack.translate(0.5, 1.0, 0.5);
         poseStack.mulPose(Axis.YP.rotation(rotation));
 
         VertexConsumer frameConsumer = buffer.getBuffer(
