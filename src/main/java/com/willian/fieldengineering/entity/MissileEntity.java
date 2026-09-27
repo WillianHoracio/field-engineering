@@ -120,22 +120,16 @@ public class MissileEntity extends ThrowableItemProjectile {
     private void updateAscendingVelocity() {
         this.setNoGravity(true);
 
-        if (getY() >= ascentCeilingY) {
-            this.setPos(getX(), ascentCeilingY, getZ());
-            this.setDeltaMovement(0.0, 0.0, 0.0);
-            return;
-        }
-
         double remainingHeight = ascentCeilingY - getY();
-        double velocityY = Math.min(ASCENT_SPEED, remainingHeight);
+        double velocityY = Math.min(ASCENT_SPEED, Math.max(0.0, remainingHeight));
 
         this.setDeltaMovement(0.0, velocityY, 0.0);
     }
 
     private void tickAscending(ServerLevel level) {
-        if (getY() > ascentCeilingY) {
-            this.setPos(getX(), ascentCeilingY, getZ());
-            this.setDeltaMovement(0.0, 0.0, 0.0);
+        if (getY() >= ascentCeilingY) {
+            this.discard();
+            return;
         }
 
         spawnTrail(level);
