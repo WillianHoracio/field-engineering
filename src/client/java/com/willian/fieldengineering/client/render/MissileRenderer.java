@@ -12,7 +12,7 @@ import org.joml.Matrix4f;
 
 public class MissileRenderer extends ThrownItemRenderer<MissileEntity> {
 
-    private static final float MISSILE_SCALE = 2.0f;
+    private static final float MISSILE_SCALE = 1.6f;
     private static final float TRAIL_LENGTH = 8.0f;
 
     public MissileRenderer(EntityRendererProvider.Context context) {

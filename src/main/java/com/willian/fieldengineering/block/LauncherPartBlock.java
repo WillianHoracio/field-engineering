@@ -26,7 +26,7 @@ public class LauncherPartBlock extends Block {
             IntegerProperty.create("offset_x", 0, 2);
 
     public static final IntegerProperty OFFSET_Y =
-            IntegerProperty.create("offset_y", 0, 1);
+            IntegerProperty.create("offset_y", 0, 2);
 
     public static final IntegerProperty OFFSET_Z =
             IntegerProperty.create("offset_z", 0, 2);
@@ -135,15 +135,9 @@ public class LauncherPartBlock extends Block {
             return expectedMasterPos;
         }
 
-        /*
-         * Fallback para estruturas antigas ou estados incompletos.
-         */
-        for (int yOffset = -1; yOffset <= 0; yOffset++) {
-
+        for (int yOffset = -2; yOffset <= 0; yOffset++) {
             for (int xOffset = -1; xOffset <= 1; xOffset++) {
-
                 for (int zOffset = -1; zOffset <= 1; zOffset++) {
-
                     BlockPos checkPos =
                             partPos.offset(
                                     xOffset,

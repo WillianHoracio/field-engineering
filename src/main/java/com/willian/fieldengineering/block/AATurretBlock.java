@@ -31,18 +31,13 @@ public class AATurretBlock extends BaseEntityBlock {
     public static final DirectionProperty FACING =
             BlockStateProperties.HORIZONTAL_FACING;
 
-    public AATurretBlock(
-            Properties properties
-    ) {
+    public AATurretBlock(Properties properties) {
         super(properties);
 
         this.registerDefaultState(
                 this.stateDefinition
                         .any()
-                        .setValue(
-                                FACING,
-                                Direction.NORTH
-                        )
+                        .setValue(FACING, Direction.NORTH)
         );
     }
 
@@ -53,27 +48,18 @@ public class AATurretBlock extends BaseEntityBlock {
 
     @Nullable
     @Override
-    public BlockState getStateForPlacement(
-            BlockPlaceContext context
-    ) {
-        Level level =
-                context.getLevel();
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        Level level = context.getLevel();
+        BlockPos masterPos = context.getClickedPos();
 
-        BlockPos masterPos =
-                context.getClickedPos();
-
-        if (!hasEnoughSpace(
-                level,
-                masterPos
-        )) {
+        if (!hasEnoughSpace(level, masterPos)) {
             return null;
         }
 
         return this.defaultBlockState()
                 .setValue(
                         FACING,
-                        context.getHorizontalDirection()
-                                .getOpposite()
+                        context.getHorizontalDirection().getOpposite()
                 );
     }
 
@@ -85,67 +71,34 @@ public class AATurretBlock extends BaseEntityBlock {
             @Nullable LivingEntity placer,
             ItemStack stack
     ) {
-        super.setPlacedBy(
-                level,
-                pos,
-                state,
-                placer,
-                stack
-        );
+        super.setPlacedBy(level, pos, state, placer, stack);
 
         if (level.isClientSide) {
             return;
         }
 
-        createMultiblockParts(
-                level,
-                pos
-        );
+        createMultiblockParts(level, pos);
     }
 
-    private boolean hasEnoughSpace(
-            Level level,
-            BlockPos masterPos
-    ) {
-        for (int y = 0; y <= 1; y++) {
-
+    private boolean hasEnoughSpace(Level level, BlockPos masterPos) {
+        for (int y = 0; y <= 2; y++) {
             for (int x = -1; x <= 1; x++) {
-
                 for (int z = -1; z <= 1; z++) {
-
-                    if (
-                            x == 0
-                                    && y == 0
-                                    && z == 0
-                    ) {
+                    if (x == 0 && y == 0 && z == 0) {
                         continue;
                     }
 
-                    BlockPos checkPos =
-                            masterPos.offset(
-                                    x,
-                                    y,
-                                    z
-                            );
+                    BlockPos checkPos = masterPos.offset(x, y, z);
 
-                    if (
-                            checkPos.getY()
-                                    < level.getMinBuildHeight()
-                    ) {
+                    if (checkPos.getY() < level.getMinBuildHeight()) {
                         return false;
                     }
 
-                    if (
-                            checkPos.getY()
-                                    >= level.getMaxBuildHeight()
-                    ) {
+                    if (checkPos.getY() >= level.getMaxBuildHeight()) {
                         return false;
                     }
 
-                    if (
-                            !level.getBlockState(checkPos)
-                                    .canBeReplaced()
-                    ) {
+                    if (!level.getBlockState(checkPos).canBeReplaced()) {
                         return false;
                     }
                 }
@@ -155,30 +108,15 @@ public class AATurretBlock extends BaseEntityBlock {
         return true;
     }
 
-    private void createMultiblockParts(
-            Level level,
-            BlockPos masterPos
-    ) {
-        for (int y = 0; y <= 1; y++) {
-
+    private void createMultiblockParts(Level level, BlockPos masterPos) {
+        for (int y = 0; y <= 2; y++) {
             for (int x = -1; x <= 1; x++) {
-
                 for (int z = -1; z <= 1; z++) {
-
-                    if (
-                            x == 0
-                                    && y == 0
-                                    && z == 0
-                    ) {
+                    if (x == 0 && y == 0 && z == 0) {
                         continue;
                     }
 
-                    BlockPos partPos =
-                            masterPos.offset(
-                                    x,
-                                    y,
-                                    z
-                            );
+                    BlockPos partPos = masterPos.offset(x, y, z);
 
                     BlockState partState =
                             ModBlocks.LAUNCHER_PART
@@ -206,39 +144,20 @@ public class AATurretBlock extends BaseEntityBlock {
         }
     }
 
-    private void removeMultiblockParts(
-            Level level,
-            BlockPos masterPos
-    ) {
-        for (int y = 0; y <= 1; y++) {
-
+    private void removeMultiblockParts(Level level, BlockPos masterPos) {
+        for (int y = 0; y <= 2; y++) {
             for (int x = -1; x <= 1; x++) {
-
                 for (int z = -1; z <= 1; z++) {
-
-                    if (
-                            x == 0
-                                    && y == 0
-                                    && z == 0
-                    ) {
+                    if (x == 0 && y == 0 && z == 0) {
                         continue;
                     }
 
-                    BlockPos partPos =
-                            masterPos.offset(
-                                    x,
-                                    y,
-                                    z
-                            );
+                    BlockPos partPos = masterPos.offset(x, y, z);
 
-                    if (
-                            level.getBlockState(partPos)
-                                    .is(ModBlocks.LAUNCHER_PART)
-                    ) {
+                    if (level.getBlockState(partPos).is(ModBlocks.LAUNCHER_PART)) {
                         level.setBlock(
                                 partPos,
-                                Blocks.AIR
-                                        .defaultBlockState(),
+                                Blocks.AIR.defaultBlockState(),
                                 Block.UPDATE_ALL
                         );
                     }
@@ -255,52 +174,27 @@ public class AATurretBlock extends BaseEntityBlock {
             BlockState newState,
             boolean movedByPiston
     ) {
-        if (
-                !state.is(
-                        newState.getBlock()
-                )
-        ) {
-            if (!level.isClientSide) {
-                removeMultiblockParts(
-                        level,
-                        pos
-                );
-            }
+        if (!state.is(newState.getBlock()) && !level.isClientSide) {
+            removeMultiblockParts(level, pos);
         }
 
-        super.onRemove(
-                state,
-                level,
-                pos,
-                newState,
-                movedByPiston
-        );
+        super.onRemove(state, level, pos, newState, movedByPiston);
     }
 
     @Override
     protected void createBlockStateDefinition(
             StateDefinition.Builder<Block, BlockState> builder
     ) {
-        builder.add(
-                FACING
-        );
+        builder.add(FACING);
     }
 
     @Override
-    public BlockEntity newBlockEntity(
-            BlockPos pos,
-            BlockState state
-    ) {
-        return new LauncherBlockEntity(
-                pos,
-                state
-        );
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new LauncherBlockEntity(pos, state);
     }
 
     @Override
-    protected RenderShape getRenderShape(
-            BlockState state
-    ) {
+    protected RenderShape getRenderShape(BlockState state) {
         return RenderShape.MODEL;
     }
 
