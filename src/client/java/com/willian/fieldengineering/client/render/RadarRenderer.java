@@ -87,7 +87,11 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
         ) * ROTATION_SPEED;
 
         poseStack.pushPose();
-        poseStack.translate(0.5, 0.70, 0.5);
+
+        // The static pedestal reaches roughly 11/16 of a block high.
+        // Keep the rotating mechanism entirely above it so the array does not clip into the base.
+        // The antenna intentionally extends into the visual space of the block above.
+        poseStack.translate(0.5, 0.98, 0.5);
         poseStack.mulPose(Axis.YP.rotation(rotation));
 
         VertexConsumer mechanismConsumer = buffer.getBuffer(
