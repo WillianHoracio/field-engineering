@@ -25,30 +25,35 @@ This branch is the visual-model pass for the launcher/radar/missile set. The lau
 
 ### Launcher
 
-- Structure now reserves a 3x3x3 volume so the launch canisters can read as tall vertical tubes instead of a short two-level machine.
-- Four canisters are grouped visually toward the center of the battery.
-- Each canister spans two upper multiblock layers and uses dark reinforcing bands plus a capped top.
-- Central/cardinal upper pieces are compact support/electronics structures rather than broad horizontal slabs.
+- Structure reserves a 3x3x3 volume so the launch canisters read as tall vertical tubes.
+- The four canisters are now packed together in a single centered 2x2 cluster above the middle of the battery rather than being spread across four outer multiblock cells.
+- The centered cluster spans the two upper layers and keeps consistent spacing/alignment between all four tubes.
+- Cardinal upper pieces remain compact support/electronics structures; diagonal upper pieces are visually empty so the launcher silhouette is dominated by the central canister pack.
 - The lower layer remains a heavy fixed installation base.
 - Structural parts still resolve directly back to the master through encoded offsets and keep a local fallback lookup.
 
 ### Missile
 
-- The missile entity now renders the mod's `aa_missile` item rather than a vanilla firework rocket.
-- The item model is now a compact 3D interceptor-style missile with a pale body, dark tail/fins, and a marked nose.
-- Render scale is reduced from the temporary 2x firework scale to 1.6x for the dedicated model.
+- The missile entity renders the mod's `aa_missile` item rather than a vanilla firework rocket.
+- The item model has explicit volumetric body sections and four physical tail fins so it reads as a 3D object from every angle.
+- The renderer no longer uses `ThrownItemRenderer` billboard orientation; it renders the item model directly and aligns the missile's local upward axis to its actual velocity vector.
+- Ascent therefore points the nose upward, while descent automatically rotates the nose toward the ground.
+- When velocity is nearly zero at the world ceiling, the renderer keeps the approved upward orientation.
+- Render scale remains 1.6x for long-range readability.
 - Existing long-range render distance, trail, particles, timing, impact precision, and TNT-like entity damage remain unchanged.
 
 ## Real-world test to perform
 
-1. verify the launcher now reads immediately as a fixed anti-air missile battery;
-2. verify the four canisters look grouped rather than scattered across the 3x3 footprint;
+1. verify the launcher reads immediately as a fixed anti-air missile battery;
+2. verify all four canisters are aligned, centered, and visibly closer together;
 3. verify the extra height does not create detached/floating geometry;
-4. verify placement correctly requires the new third layer of free space;
+4. verify placement still correctly requires the third layer of free space;
 5. break parts from all three layers and verify the master/whole structure still dismantles;
-6. verify the custom missile model is visible during ascent, ceiling wait, and descent;
-7. verify missile visuals remain readable at long range and the existing trail still follows it;
-8. verify targeting, timing, cooldown, impact, damage, and radar behavior are unchanged.
+6. verify the custom missile is visibly three-dimensional from side and diagonal views;
+7. verify ascent points the missile nose upward;
+8. verify descent flips the missile so the nose points toward the target/ground;
+9. verify the ceiling wait keeps a stable upward orientation;
+10. verify the existing long-range trail still follows the missile and targeting/timing/cooldown/impact/damage are unchanged.
 
 ## Known/intentional constraints
 
@@ -61,5 +66,5 @@ This branch is the visual-model pass for the launcher/radar/missile set. The lau
 
 1. final launcher proportion/texturing pass;
 2. radar redesign in the same visual language;
-3. missile orientation/polish if the dedicated item model needs refinement in flight;
+3. missile scale/texturing polish if needed after orientation testing;
 4. final Sodium/Iris/shader compatibility check before merge.
