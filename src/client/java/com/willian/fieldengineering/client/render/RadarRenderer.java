@@ -20,10 +20,10 @@ import net.minecraft.resources.ResourceLocation;
 public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
 
     private static final ResourceLocation ARRAY_TEXTURE =
-            ResourceLocation.withDefaultNamespace("textures/block/green_terracotta.png");
+            ResourceLocation.withDefaultNamespace("textures/block/oxidized_copper.png");
 
     private static final ResourceLocation MECHANISM_TEXTURE =
-            ResourceLocation.withDefaultNamespace("textures/block/polished_deepslate.png");
+            ResourceLocation.withDefaultNamespace("textures/block/iron_block.png");
 
     private static final float ROTATION_SPEED = 0.032f;
 
@@ -52,11 +52,11 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
                 "array",
                 CubeListBuilder.create()
                         .texOffs(0, 0)
-                        .addBox(-7.0f, -12.0f, -1.0f, 14.0f, 7.0f, 2.0f)
+                        .addBox(-8.0f, -13.0f, -1.0f, 16.0f, 8.0f, 2.0f)
                         .texOffs(0, 0)
-                        .addBox(-6.0f, -13.5f, -0.75f, 12.0f, 1.0f, 1.5f)
+                        .addBox(-7.0f, -14.0f, -0.75f, 14.0f, 1.0f, 1.5f)
                         .texOffs(0, 0)
-                        .addBox(-3.0f, -5.0f, -1.25f, 6.0f, 1.0f, 2.5f),
+                        .addBox(-3.5f, -5.0f, -1.25f, 7.0f, 1.0f, 2.5f),
                 PartPose.ZERO
         );
 
@@ -88,10 +88,9 @@ public class RadarRenderer implements BlockEntityRenderer<RadarBlockEntity> {
 
         poseStack.pushPose();
 
-        // The static pedestal reaches roughly 11/16 of a block high.
-        // Keep the rotating mechanism entirely above it so the array does not clip into the base.
-        // The antenna intentionally extends into the visual space of the block above.
-        poseStack.translate(0.5, 0.98, 0.5);
+        // The static block occupies the lower block. The rotating assembly is anchored
+        // in the block above, giving the radar an intentional two-block-tall silhouette.
+        poseStack.translate(0.5, 1.80, 0.5);
         poseStack.mulPose(Axis.YP.rotation(rotation));
 
         VertexConsumer mechanismConsumer = buffer.getBuffer(
