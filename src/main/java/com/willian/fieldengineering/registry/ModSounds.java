@@ -16,6 +16,9 @@ public class ModSounds {
     public static final SoundEvent MISSILE_EXPLOSION =
             registerSound("missile_explosion");
 
+    public static final SoundEvent RADAR_BEEP =
+            registerSound("radar_beep");
+
     private static SoundEvent registerSound(String name) {
         return Registry.register(
                 BuiltInRegistries.SOUND_EVENT,
