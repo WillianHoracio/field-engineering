@@ -13,5 +13,13 @@
     "sounds": [
       "field-engineering:explosion"
     ]
+  },
+  "radar_beep": {
+    "sounds": [
+      {
+        "name": "minecraft:block.note_block.bit",
+        "type": "event"
+      }
+    ]
   }
 }
