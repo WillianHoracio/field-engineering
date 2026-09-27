@@ -1,3 +1,74 @@
 {
-  "parent": "field-engineering:block/radar"
+  "parent": "minecraft:block/block",
+  "textures": {
+    "dark": "minecraft:block/polished_deepslate",
+    "metal": "minecraft:block/iron_block",
+    "copper": "minecraft:block/weathered_copper",
+    "particle": "minecraft:block/iron_block"
+  },
+  "elements": [
+    {
+      "from": [1, 0, 1], "to": [15, 2, 15],
+      "faces": {
+        "north": {"texture": "#dark"}, "south": {"texture": "#dark"},
+        "east": {"texture": "#dark"}, "west": {"texture": "#dark"},
+        "up": {"texture": "#dark"}, "down": {"texture": "#dark"}
+      }
+    },
+    {
+      "from": [2, 2, 2], "to": [14, 7, 14],
+      "faces": {
+        "north": {"texture": "#metal"}, "south": {"texture": "#metal"},
+        "east": {"texture": "#metal"}, "west": {"texture": "#metal"},
+        "up": {"texture": "#metal"}, "down": {"texture": "#metal"}
+      }
+    },
+    {
+      "from": [4, 7, 4], "to": [12, 9, 12],
+      "faces": {
+        "north": {"texture": "#copper"}, "south": {"texture": "#copper"},
+        "east": {"texture": "#copper"}, "west": {"texture": "#copper"},
+        "up": {"texture": "#copper"}, "down": {"texture": "#copper"}
+      }
+    },
+    {
+      "from": [6, 9, 6], "to": [10, 15, 10],
+      "faces": {
+        "north": {"texture": "#dark"}, "south": {"texture": "#dark"},
+        "east": {"texture": "#dark"}, "west": {"texture": "#dark"},
+        "up": {"texture": "#dark"}, "down": {"texture": "#dark"}
+      }
+    },
+    {
+      "from": [5, 15, 6.5], "to": [11, 17, 9.5],
+      "faces": {
+        "north": {"texture": "#dark"}, "south": {"texture": "#dark"},
+        "east": {"texture": "#dark"}, "west": {"texture": "#dark"},
+        "up": {"texture": "#dark"}, "down": {"texture": "#dark"}
+      }
+    },
+    {
+      "from": [2, 17, 7.25], "to": [14, 25, 8.75],
+      "faces": {
+        "north": {"texture": "#metal"}, "south": {"texture": "#metal"},
+        "east": {"texture": "#metal"}, "west": {"texture": "#metal"},
+        "up": {"texture": "#metal"}, "down": {"texture": "#metal"}
+      }
+    },
+    {
+      "from": [6, 16, 5.5], "to": [10, 19, 7.25],
+      "faces": {
+        "north": {"texture": "#copper"}, "south": {"texture": "#copper"},
+        "east": {"texture": "#copper"}, "west": {"texture": "#copper"},
+        "up": {"texture": "#copper"}, "down": {"texture": "#copper"}
+      }
+    }
+  ],
+  "display": {
+    "gui": {"rotation": [28, 45, 0], "translation": [0, -2, 0], "scale": [0.5, 0.5, 0.5]},
+    "ground": {"rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.36, 0.36, 0.36]},
+    "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.46, 0.46, 0.46]},
+    "firstperson_righthand": {"rotation": [0, 45, 0], "translation": [0, 1, 0], "scale": [0.34, 0.34, 0.34]},
+    "thirdperson_righthand": {"rotation": [0, 45, 0], "translation": [0, 1, 0], "scale": [0.31, 0.31, 0.31]}
+  }
 }

@@ -8,16 +8,49 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 
 public class LauncherPartBlock extends Block {
 
     public static final MapCodec<LauncherPartBlock> CODEC =
             simpleCodec(LauncherPartBlock::new);
 
+    /*
+     * IntegerProperty não aceita valores negativos.
+     *
+     * X/Z são armazenados como 0..2 e representam
+     * offsets reais -1..1 através de encode/decode.
+     */
+    public static final IntegerProperty OFFSET_X =
+            IntegerProperty.create("offset_x", 0, 2);
+
+    public static final IntegerProperty OFFSET_Y =
+            IntegerProperty.create("offset_y", 0, 2);
+
+    public static final IntegerProperty OFFSET_Z =
+            IntegerProperty.create("offset_z", 0, 2);
+
     public LauncherPartBlock(
             Properties properties
     ) {
         super(properties);
+
+        this.registerDefaultState(
+                this.stateDefinition
+                        .any()
+                        .setValue(OFFSET_X, 1)
+                        .setValue(OFFSET_Y, 0)
+                        .setValue(OFFSET_Z, 1)
+        );
+    }
+
+    public static int encodeHorizontalOffset(int offset) {
+        return offset + 1;
+    }
+
+    public static int decodeHorizontalOffset(int encodedOffset) {
+        return encodedOffset - 1;
     }
 
     @Override
@@ -26,17 +59,21 @@ public class LauncherPartBlock extends Block {
     }
 
     @Override
+    protected void createBlockStateDefinition(
+            StateDefinition.Builder<Block, BlockState> builder
+    ) {
+        builder.add(
+                OFFSET_X,
+                OFFSET_Y,
+                OFFSET_Z
+        );
+    }
+
+    @Override
     protected RenderShape getRenderShape(
             BlockState state
     ) {
-        /*
-         * Esse bloco existe apenas para reservar
-         * fisicamente o espaço da torre.
-         *
-         * O modelo visual inteiro é renderizado
-         * pelo bloco central.
-         */
-        return RenderShape.INVISIBLE;
+        return RenderShape.MODEL;
     }
 
     @Override
@@ -50,17 +87,11 @@ public class LauncherPartBlock extends Block {
             BlockPos masterPos =
                     findMasterBlock(
                             level,
-                            pos
+                            pos,
+                            state
                     );
 
             if (masterPos != null) {
-                /*
-                 * Quebrar qualquer parte quebra
-                 * o bloco principal.
-                 *
-                 * Se não estiver no criativo,
-                 * o bloco principal dropa o item.
-                 */
                 level.destroyBlock(
                         masterPos,
                         !player.isCreative(),
@@ -79,25 +110,34 @@ public class LauncherPartBlock extends Block {
 
     private BlockPos findMasterBlock(
             Level level,
-            BlockPos partPos
+            BlockPos partPos,
+            BlockState state
     ) {
-        /*
-         * O master sempre fica:
-         *
-         * - no centro do 3x3;
-         * - na camada inferior.
-         *
-         * Como não armazenamos BlockEntity
-         * nas partes auxiliares, procuramos
-         * o master nessa pequena região.
-         */
+        int offsetX = decodeHorizontalOffset(
+                state.getValue(OFFSET_X)
+        );
 
-        for (int yOffset = -1; yOffset <= 0; yOffset++) {
+        int offsetZ = decodeHorizontalOffset(
+                state.getValue(OFFSET_Z)
+        );
 
+        BlockPos expectedMasterPos =
+                partPos.offset(
+                        -offsetX,
+                        -state.getValue(OFFSET_Y),
+                        -offsetZ
+                );
+
+        if (
+                level.getBlockState(expectedMasterPos)
+                        .is(ModBlocks.AA_TURRET)
+        ) {
+            return expectedMasterPos;
+        }
+
+        for (int yOffset = -2; yOffset <= 0; yOffset++) {
             for (int xOffset = -1; xOffset <= 1; xOffset++) {
-
                 for (int zOffset = -1; zOffset <= 1; zOffset++) {
-
                     BlockPos checkPos =
                             partPos.offset(
                                     xOffset,

@@ -1,13 +1,13 @@
 package com.willian.fieldengineering.entity;
 
 import com.willian.fieldengineering.registry.ModEntities;
+import com.willian.fieldengineering.registry.ModItems;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 
 public class MissileEntity extends ThrowableItemProjectile {
@@ -34,7 +34,6 @@ public class MissileEntity extends ThrowableItemProjectile {
             Level level
     ) {
         super(type, level);
-
         configureVisual();
     }
 
@@ -44,33 +43,16 @@ public class MissileEntity extends ThrowableItemProjectile {
             double y,
             double z
     ) {
-        super(
-                ModEntities.MISSILE,
-                x,
-                y,
-                z,
-                level
-        );
+        super(ModEntities.MISSILE, x, y, z, level);
 
         configureVisual();
-
         this.descending = false;
-
         this.setNoGravity(true);
-
-        this.setDeltaMovement(
-                0.0,
-                ASCENT_SPEED,
-                0.0
-        );
+        this.setDeltaMovement(0.0, ASCENT_SPEED, 0.0);
     }
 
     private void configureVisual() {
-        this.setItem(
-                new ItemStack(
-                        Items.FIREWORK_ROCKET
-                )
-        );
+        this.setItem(new ItemStack(ModItems.AA_MISSILE));
     }
 
     public void configureAscendingCeiling(double maxY) {
@@ -97,20 +79,14 @@ public class MissileEntity extends ThrowableItemProjectile {
         this.impactY = impactY;
         this.impactZ = impactZ;
 
-        this.setPos(
-                descentStartX,
-                descentStartY,
-                descentStartZ
-        );
-
+        this.setPos(descentStartX, descentStartY, descentStartZ);
         this.setNoGravity(true);
-
         updateDescendingVelocity();
     }
 
     @Override
     protected Item getDefaultItem() {
-        return Items.FIREWORK_ROCKET;
+        return ModItems.AA_MISSILE;
     }
 
     @Override
@@ -121,7 +97,6 @@ public class MissileEntity extends ThrowableItemProjectile {
     @Override
     public void tick() {
         if (level() instanceof ServerLevel) {
-
             if (descending) {
                 updateDescendingVelocity();
             } else {
@@ -145,110 +120,42 @@ public class MissileEntity extends ThrowableItemProjectile {
     private void updateAscendingVelocity() {
         this.setNoGravity(true);
 
-        if (getY() >= ascentCeilingY) {
-            this.setPos(
-                    getX(),
-                    ascentCeilingY,
-                    getZ()
-            );
-
-            this.setDeltaMovement(
-                    0.0,
-                    0.0,
-                    0.0
-            );
-
-            return;
-        }
-
         double remainingHeight = ascentCeilingY - getY();
-        double velocityY = Math.min(
-                ASCENT_SPEED,
-                remainingHeight
-        );
+        double velocityY = Math.min(ASCENT_SPEED, Math.max(0.0, remainingHeight));
 
-        this.setDeltaMovement(
-                0.0,
-                velocityY,
-                0.0
-        );
+        this.setDeltaMovement(0.0, velocityY, 0.0);
     }
 
-    private void tickAscending(
-            ServerLevel level
-    ) {
-        if (getY() > ascentCeilingY) {
-            this.setPos(
-                    getX(),
-                    ascentCeilingY,
-                    getZ()
-            );
-
-            this.setDeltaMovement(
-                    0.0,
-                    0.0,
-                    0.0
-            );
+    private void tickAscending(ServerLevel level) {
+        if (getY() >= ascentCeilingY) {
+            this.discard();
+            return;
         }
 
         spawnTrail(level);
     }
 
-    private void tickDescending(
-            ServerLevel level
-    ) {
+    private void tickDescending(ServerLevel level) {
         spawnTrail(level);
 
         if (this.tickCount < DESCENT_TICKS) {
             return;
         }
 
-        /*
-         * Garante que a explosão realmente aconteça
-         * exatamente na coordenada travada.
-         */
-        this.setPos(
-                impactX,
-                impactY,
-                impactZ
-        );
-
+        this.setPos(impactX, impactY, impactZ);
         explode(level);
     }
 
     private void updateDescendingVelocity() {
-        /*
-         * Percorre toda a distância desde o topo do mundo
-         * até a coordenada travada exatamente em 18 ticks.
-         */
-        double velocityX =
-                (impactX - descentStartX)
-                        / DESCENT_TICKS;
-
-        double velocityY =
-                (impactY - descentStartY)
-                        / DESCENT_TICKS;
-
-        double velocityZ =
-                (impactZ - descentStartZ)
-                        / DESCENT_TICKS;
+        double velocityX = (impactX - descentStartX) / DESCENT_TICKS;
+        double velocityY = (impactY - descentStartY) / DESCENT_TICKS;
+        double velocityZ = (impactZ - descentStartZ) / DESCENT_TICKS;
 
         this.setNoGravity(true);
-
-        this.setDeltaMovement(
-                velocityX,
-                velocityY,
-                velocityZ
-        );
+        this.setDeltaMovement(velocityX, velocityY, velocityZ);
     }
 
-    private void explode(
-            ServerLevel level
-    ) {
-        /*
-         * Explosão equivalente a TNT,
-         * mas sem interação destrutiva com blocos.
-         */
+    private void explode(ServerLevel level) {
         level.explode(
                 this,
                 impactX,
@@ -262,9 +169,7 @@ public class MissileEntity extends ThrowableItemProjectile {
         this.discard();
     }
 
-    private void spawnTrail(
-            ServerLevel level
-    ) {
+    private void spawnTrail(ServerLevel level) {
         double x = getX();
         double y = getY();
         double z = getZ();

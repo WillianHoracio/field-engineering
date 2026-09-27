@@ -1,11 +1,14 @@
 package com.willian.fieldengineering.blockentity;
 
 import com.willian.fieldengineering.registry.ModBlockEntities;
+import com.willian.fieldengineering.registry.ModSounds;
 import com.willian.fieldengineering.target.TargetRules;
 import com.willian.fieldengineering.tracking.RadarRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
@@ -22,6 +25,11 @@ public class RadarBlockEntity extends BlockEntity {
     private static final double RANGE = 100.0;
     private static final double RANGE_SQR = RANGE * RANGE;
     private static final long SCAN_CACHE_TICKS = 20L;
+
+    private static final int RADAR_BEEP_INTERVAL_TICKS = 40;
+    private static final double RADAR_BEEP_RANGE = 18.0;
+    private static final double RADAR_BEEP_RANGE_SQR =
+            RADAR_BEEP_RANGE * RADAR_BEEP_RANGE;
 
     private final List<UUID> cachedTargetUuids = new ArrayList<>();
 
@@ -50,6 +58,7 @@ public class RadarBlockEntity extends BlockEntity {
         }
 
         radar.ensureRegistered(serverLevel);
+        radar.tickAmbientBeep(serverLevel);
     }
 
     public List<LivingEntity> getDetectedTargets(
@@ -159,6 +168,45 @@ public class RadarBlockEntity extends BlockEntity {
                 0.4,
                 0.05
         );
+    }
+
+    private void tickAmbientBeep(ServerLevel level) {
+        int phase = Math.floorMod(
+                Long.hashCode(worldPosition.asLong()),
+                RADAR_BEEP_INTERVAL_TICKS
+        );
+
+        if (
+                (level.getGameTime() + phase)
+                        % RADAR_BEEP_INTERVAL_TICKS != 0
+        ) {
+            return;
+        }
+
+        double x = worldPosition.getX() + 0.5;
+        double y = worldPosition.getY() + 1.0;
+        double z = worldPosition.getZ() + 0.5;
+
+        for (ServerPlayer player : level.players()) {
+            if (
+                    player.isSpectator()
+                            || player.distanceToSqr(x, y, z)
+                            > RADAR_BEEP_RANGE_SQR
+            ) {
+                continue;
+            }
+
+            level.playSound(
+                    null,
+                    worldPosition,
+                    ModSounds.RADAR_BEEP,
+                    SoundSource.BLOCKS,
+                    0.35f,
+                    1.5f
+            );
+
+            return;
+        }
     }
 
     private void ensureRegistered(ServerLevel level) {

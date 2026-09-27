@@ -58,14 +58,34 @@ tracking/TargetReservationRegistry.java
 
 Physical structure:
 
-- one master block;
+- one master block at the center of the lower layer;
 - 3x3 footprint;
-- two blocks high;
-- 17 invisible auxiliary blocks reserve the remaining volume;
+- three blocks high;
+- 26 auxiliary structural blocks reserve the remaining volume;
+- every auxiliary part stores `offset_x`, `offset_y`, and `offset_z` relative to the master;
+- auxiliary parts can render their own local model slice, allowing one visual installation to span the whole 3x3x3 structure without oversized single-block geometry;
 - breaking an auxiliary part destroys the master;
 - the master removes the auxiliary parts when removed.
 
-The master owns launcher state.
+The master owns launcher state. Structural parts contain only placement/visual identity and master-relative offsets; they do not own launcher simulation state.
+
+#### Multiblock visual model
+
+The static SAM launcher model is intentionally distributed across the already-reserved multiblock volume:
+
+```text
+lower layer: heavy platform/base pieces + master machinery
+middle layer center: lower half of a tightly packed 2x2 launch-canister cluster
+middle layer cardinal cells: compact support/electronics pieces
+upper layer center: upper half/caps of the same 2x2 canister cluster
+other upper cells: visually empty structural reservation
+```
+
+The four canisters are deliberately grouped inside the central column rather than spread across the outer corners. This keeps their spacing/alignment consistent and makes the launcher read more clearly as a fixed SAM battery.
+
+Each block model remains inside normal local model bounds. This avoids Blockbench/Minecraft `model too large` problems while preserving the intended full installation scale.
+
+Current launcher geometry uses vanilla textures as placeholders during shape validation. Dedicated textures should be added only after the geometry is approved ingame.
 
 #### Target acquisition
 
@@ -112,7 +132,7 @@ after 18 descending ticks: explosion at locked coordinate
 
 The historical strike timing is preserved: the old 40-tick ascent phase plus 140-tick wait still defines the 180-tick launch-to-lock interval. The difference is visual continuity: the ascending missile is no longer discarded after 40 ticks. The launcher owns its UUID and removes it exactly when the descending phase begins or when the strike is cancelled.
 
-The descending missile now starts at `maxBuildHeight - 2` rather than a fixed 90 blocks above the target. Its velocity is calculated from the full ceiling-to-impact distance so it still reaches the locked coordinate in 18 ticks. The final position is snapped to the authoritative impact coordinate before explosion, preserving precision.
+The descending missile starts at `maxBuildHeight - 2`. Its velocity is calculated from the full ceiling-to-impact distance so it still reaches the locked coordinate in 18 ticks. The final position is snapped to the authoritative impact coordinate before explosion, preserving precision.
 
 The explosion damages entities and causes knockback but does not destroy terrain.
 
@@ -124,6 +144,7 @@ Primary files:
 ```text
 entity/MissileEntity.java
 client/render/MissileRenderer.java
+models/item/aa_missile.json
 ```
 
 Responsibilities:
@@ -131,9 +152,11 @@ Responsibilities:
 - preserve the server-authoritative ascending and descending missile entity;
 - allow ascent to continue to the world ceiling instead of self-despawning after two seconds;
 - keep the approved firework/smoke/flame particles for close-range detail;
-- render the vanilla firework body at a larger client-side scale for readability;
+- render a dedicated volumetric `aa_missile` item model with explicit body depth and four tail fins;
+- render that item model directly rather than through `ThrownItemRenderer` camera-facing billboard orientation;
+- align the missile model's local upward axis to the synchronized velocity vector, so ascent points nose-up and descent automatically points nose-down toward the target;
+- keep an upward fallback orientation while velocity is near zero at the world ceiling;
 - render a direct client-side layered trail from missile velocity, independent of the vanilla particle-distance limit;
-- preserve a vertical trail while a missile is stationary at the world ceiling without relying on unsynchronized server-only state;
 - explicitly allow missile rendering up to 1024 blocks through `shouldRenderAtSqrDistance`;
 - descend from the world ceiling to the exact locked coordinate in the existing 18-tick descent window;
 - vanilla explosion with terrain destruction disabled.
@@ -199,6 +222,8 @@ lifecycle/event -> registry/index -> cheap mathematical filter -> resolve only r
 For periodic systems, spread work across time and cache shared results rather than making every instance independently repeat the same query.
 
 For missile visuals, prefer a bounded render-time effect derived from already-synchronized entity velocity over increasing continuous server particle traffic or extending entity tracking beyond what gameplay requires.
+
+For multiblock visuals, prefer distributing normal local models across structural parts over rendering one giant model far outside a single block's normal bounds.
 
 ## Planned systems
 

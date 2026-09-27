@@ -1,8 +1,11 @@
 package com.willian.fieldengineering.client;
 
 import com.willian.fieldengineering.client.render.MissileRenderer;
+import com.willian.fieldengineering.client.render.RadarRenderer;
+import com.willian.fieldengineering.registry.ModBlockEntities;
 import com.willian.fieldengineering.registry.ModEntities;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 
 public class FieldEngineeringClient implements ClientModInitializer {
@@ -12,6 +15,11 @@ public class FieldEngineeringClient implements ClientModInitializer {
 		EntityRendererRegistry.register(
 				ModEntities.MISSILE,
 				MissileRenderer::new
+		);
+
+		BlockEntityRendererRegistry.register(
+				ModBlockEntities.RADAR,
+				RadarRenderer::new
 		);
 	}
 }
